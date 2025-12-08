@@ -1,6 +1,6 @@
 'use client';
 
-import { usePrivy, usePrivyWalletAddress } from '@privy-io/react-auth';
+import { usePrivy } from '@privy-io/react-auth';
 import { useMemo, useEffect, useCallback, useState } from 'react';
 
 export interface AuthUser {

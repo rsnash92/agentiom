@@ -1,16 +1,36 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Mark problematic packages as external to avoid Turbopack bundling issues
-  serverExternalPackages: ['thread-stream', 'pino', 'pino-pretty'],
+  // Mark problematic packages as external to avoid bundling issues
+  serverExternalPackages: [
+    'thread-stream',
+    'pino',
+    'pino-pretty',
+    'sonic-boom',
+    '@privy-io/server-auth',
+    '@privy-io/public-api',
+  ],
 
-  // Transpile Privy packages for compatibility
-  transpilePackages: ['@privy-io/react-auth', '@privy-io/server-auth'],
+  // Webpack configuration to handle problematic modules
+  webpack: (config, { isServer }) => {
+    // Ignore test files and other non-essential files in node_modules
+    config.module.rules.push({
+      test: /node_modules\/@privy-io\/.*\/(test|bench|README|LICENSE|\.sh|\.zip|\.yml)/,
+      use: 'ignore-loader',
+    });
 
-  // Disable Turbopack for production builds (issues with Privy dependencies)
-  // Dev mode still uses Turbopack via --turbopack flag
-  experimental: {
-    // Use webpack for production builds
+    // Handle pino and thread-stream issues
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        worker_threads: false,
+      };
+    }
+
+    return config;
   },
 };
 

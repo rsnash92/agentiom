@@ -96,7 +96,7 @@ function AgentsPageContent() {
                         <Badge
                           variant={
                             agent.status === 'active' ? 'success' :
-                            agent.status === 'paused' ? 'warning' : 'secondary'
+                            agent.status === 'paused' ? 'warning' : 'default'
                           }
                           size="sm"
                           className="cursor-pointer hover:opacity-80 transition-opacity"

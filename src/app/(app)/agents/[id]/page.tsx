@@ -66,7 +66,7 @@ function AgentTradingPageContent() {
 
   // Update selected coin based on agent's approved pairs
   useEffect(() => {
-    if (agent?.policies?.approvedPairs?.length > 0) {
+    if (agent?.policies?.approvedPairs && agent.policies.approvedPairs.length > 0) {
       const firstPair = agent.policies.approvedPairs[0];
       const coin = firstPair.replace('-PERP', '').split('/')[0];
       setSelectedCoin(coin);

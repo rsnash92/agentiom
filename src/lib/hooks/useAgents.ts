@@ -18,6 +18,19 @@ export interface Agent {
     approvedPairs: string[];
   };
   llmProvider: string;
+  llmConfig?: {
+    primaryModel: string;
+    simpleModel: string;
+    analysisModel: string;
+    autoSelect: boolean;
+    parameters: {
+      temperature: number;
+      topP: number;
+      frequencyPenalty: number;
+      presencePenalty: number;
+      maxTokens: number;
+    };
+  };
   executionIntervalSeconds: number;
   status: string;
   genomeId: string | null;

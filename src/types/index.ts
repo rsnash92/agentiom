@@ -1,4 +1,8 @@
 // Core Types for Agentiom
+import type { AgentLLMConfig } from '@/lib/llm/types';
+
+// Re-export for convenience
+export type { AgentLLMConfig } from '@/lib/llm/types';
 
 // ============================================
 // Agent Types
@@ -43,6 +47,7 @@ export interface Agent {
 
   // Configuration
   llmProvider: LLMProvider;
+  llmConfig?: AgentLLMConfig;
   executionIntervalSeconds: number;
   dataWeights: Record<string, number>;
 
