@@ -9,9 +9,8 @@ export default function Home() {
       <nav className="fixed top-0 w-full z-50 glass">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
-              <Logo size={20} />
-              <span className="text-xl font-bold">Agentiom</span>
+            <div className="flex items-center">
+              <Logo height={24} />
             </div>
             <div className="hidden md:flex items-center gap-8">
               <Link href="#features" className="text-foreground-muted hover:text-foreground transition-colors">
@@ -154,9 +153,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Logo size={20} />
-                <span className="text-xl font-bold">Agentiom</span>
+              <div className="mb-4">
+                <Logo height={20} />
               </div>
               <p className="text-foreground-muted text-sm">
                 AI-powered trading agents for Hyperliquid perpetual futures.

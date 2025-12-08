@@ -2,17 +2,21 @@ import Image from 'next/image';
 
 interface LogoProps {
   className?: string;
-  size?: number;
+  height?: number;
 }
 
-export function Logo({ className = '', size = 20 }: LogoProps) {
+export function Logo({ className = '', height = 20 }: LogoProps) {
+  // Logo aspect ratio is approximately 8.63:1 (2563x297)
+  const width = Math.round(height * 8.63);
+
   return (
     <Image
       src="/logo.png"
       alt="Agentiom"
-      width={size}
-      height={size}
+      width={width}
+      height={height}
       className={className}
+      priority
     />
   );
 }

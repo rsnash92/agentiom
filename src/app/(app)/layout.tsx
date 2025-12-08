@@ -24,9 +24,8 @@ export default function AppLayout({
       <nav className="sticky top-0 z-50 flex items-center justify-between h-14 px-5 bg-background">
         {/* Left side - Logo + Nav */}
         <div className="flex items-center gap-8">
-          <Link href="/discover" className="flex items-center gap-2.5 text-xl font-bold">
-            <Logo size={20} />
-            AGENTIOM
+          <Link href="/discover" className="flex items-center">
+            <Logo height={20} />
           </Link>
 
           <div className="flex items-center gap-1">
