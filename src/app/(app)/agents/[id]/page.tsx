@@ -305,7 +305,7 @@ function AgentTradingPageContent() {
 
         {/* Positions Table Panel - hide in fullscreen */}
         {!isFullscreen && (
-          <div className="panel h-[180px] overflow-hidden">
+          <div className="panel h-[280px] overflow-hidden">
             <PositionsTable
               positions={[]}
               orders={[]}
