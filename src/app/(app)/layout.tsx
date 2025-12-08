@@ -25,7 +25,7 @@ export default function AppLayout({
         {/* Left side - Logo + Nav */}
         <div className="flex items-center gap-8">
           <Link href="/discover" className="flex items-center">
-            <Logo height={10} />
+            <Logo height={12} />
           </Link>
 
           <div className="flex items-center gap-1">
