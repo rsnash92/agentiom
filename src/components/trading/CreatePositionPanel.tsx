@@ -1,6 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import {
+  TabGroup,
+  Fieldset,
+  FormInput,
+  FormSelect,
+  CollapsibleSection,
+  SegmentedControl,
+  RadioGroup,
+  Checkbox,
+  RangeSlider,
+  ActionButton,
+  DualInputRow,
+  DateTimeInput,
+  InfoRow,
+} from '@/components/ui/trading-form';
 
 interface CreatePositionPanelProps {
   currentPrice?: number;
@@ -8,342 +23,280 @@ interface CreatePositionPanelProps {
   balance?: number;
 }
 
-const LEVERAGE_PRESETS = [2, 5, 10, 25];
+const STRATEGIES = [
+  { value: 'impact', label: 'Impact Minimization' },
+  { value: 'twap', label: 'TWAP' },
+  { value: 'vwap', label: 'VWAP' },
+  { value: 'iceberg', label: 'Iceberg' },
+];
+
+const URGENCY_OPTIONS = [
+  { value: 'very_low', label: 'Very Low' },
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'very_high', label: 'Very High' },
+];
+
+const PRICE_OPTIONS = [
+  { value: 'mid', label: 'Mid' },
+  { value: 'bid', label: 'Bid' },
+  { value: 'pct', label: '↓1%' },
+];
 
 export function CreatePositionPanel({
   currentPrice = 89319.5,
   symbol = 'BTC/USD',
   balance = 0,
 }: CreatePositionPanelProps) {
-  const [direction, setDirection] = useState<'long' | 'short' | 'swap'>('long');
-  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
-  const [amount, setAmount] = useState('');
-  const [leverage, setLeverage] = useState(2);
-  const [marginMode, setMarginMode] = useState<'cross' | 'isolated'>('isolated');
-  const [stopLoss, setStopLoss] = useState(false);
-  const [takeProfit, setTakeProfit] = useState(false);
-  const [showExecutionDetails, setShowExecutionDetails] = useState(false);
+  // Form state
+  const [direction, setDirection] = useState<'buy' | 'sell'>('buy');
+  const [baseAmount, setBaseAmount] = useState('');
+  const [quoteAmount, setQuoteAmount] = useState('');
+  const [strategy, setStrategy] = useState('impact');
+  const [limitPrice, setLimitPrice] = useState('');
+  const [priceType, setPriceType] = useState('mid');
+  const [oolPause, setOolPause] = useState(false);
+  const [entry, setEntry] = useState(false);
+  const [duration, setDuration] = useState('5');
+  const [timezone, setTimezone] = useState('Europe/London UTC+00:00');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
 
-  const getRiskLevel = (lev: number) => {
-    if (lev <= 2) return { label: 'LOW RISK', color: 'text-success', bg: 'bg-success/10' };
-    if (lev <= 5) return { label: 'MEDIUM RISK', color: 'text-warning', bg: 'bg-warning/10' };
-    return { label: 'HIGH RISK', color: 'text-error', bg: 'bg-error/10' };
-  };
+  // Exit conditions
+  const [takeProfitType, setTakeProfitType] = useState('%');
+  const [takeProfitValue, setTakeProfitValue] = useState('');
+  const [takeProfitPrice, setTakeProfitPrice] = useState('');
+  const [takeProfitUrgency, setTakeProfitUrgency] = useState('high');
+  const [stopLossType, setStopLossType] = useState('%');
+  const [stopLossValue, setStopLossValue] = useState('');
+  const [stopLossPrice, setStopLossPrice] = useState('');
+  const [stopLossUrgency, setStopLossUrgency] = useState('high');
 
-  const risk = getRiskLevel(leverage);
+  const baseCoin = symbol.split('/')[0];
+  const quoteCoin = 'USDT';
 
   return (
-    <div className="flex flex-col h-full bg-background-secondary">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-        <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
-          <PlusCircleIcon className="w-5 h-5 text-orange-500" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold">Create Position</h3>
-          <p className="text-xs text-foreground-muted">Create new positions manually for your agent</p>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-full bg-background">
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Direction & Order Type Card */}
-        <div className="m-3 p-4 bg-gradient-to-br from-[#1a1a2e] to-[#16162a] rounded-xl border border-border/50">
-          {/* Direction Tabs */}
-          <div className="flex gap-2 mb-4">
-            <button
-              onClick={() => setDirection('long')}
-              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${
-                direction === 'long'
-                  ? 'bg-success text-black'
-                  : 'bg-card/50 text-foreground-muted hover:text-foreground'
-              }`}
-            >
-              Long
-            </button>
-            <button
-              onClick={() => setDirection('short')}
-              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${
-                direction === 'short'
-                  ? 'bg-error text-white'
-                  : 'bg-card/50 text-foreground-muted hover:text-foreground'
-              }`}
-            >
-              Short
-            </button>
-            <button
-              onClick={() => setDirection('swap')}
-              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${
-                direction === 'swap'
-                  ? 'bg-primary text-black'
-                  : 'bg-card/50 text-foreground-subtle hover:text-foreground-muted'
-              }`}
-            >
-              Swap
-            </button>
-          </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Account & Direction */}
+        <div className="grid grid-cols-[1fr_auto] gap-3">
+          <FormSelect
+            label="Accounts"
+            value="default"
+            options={[{ value: 'default', label: 'Accounts' }]}
+          />
+          <TabGroup
+            tabs={[
+              { value: 'buy', label: 'Buy', variant: 'success' },
+              { value: 'sell', label: 'Sell', variant: 'error' },
+            ]}
+            value={direction}
+            onChange={(v) => setDirection(v as 'buy' | 'sell')}
+            className="w-[180px]"
+          />
+        </div>
 
-          {/* Order Type */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setOrderType('market')}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                orderType === 'market'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-foreground-muted hover:text-foreground'
-              }`}
-            >
-              Market
-            </button>
-            <button
-              onClick={() => setOrderType('limit')}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                orderType === 'limit'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-foreground-muted hover:text-foreground'
-              }`}
-            >
-              Limit
-            </button>
-            <button className="p-1.5 text-foreground-muted hover:text-foreground transition-colors ml-auto">
-              <SettingsIcon className="w-5 h-5" />
-            </button>
+        {/* Amount Inputs */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <FormInput
+              value={baseAmount}
+              onChange={(e) => setBaseAmount(e.target.value)}
+              placeholder={baseCoin}
+            />
+            <div className="relative h-1 bg-border/40 rounded-full">
+              <RangeSlider value={0} onChange={() => {}} min={0} max={100} showTicks />
+            </div>
+            <div className="text-xs text-foreground-muted text-center mt-1">
+              ≡ 0.00 {baseCoin}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <FormInput
+              value={quoteAmount}
+              onChange={(e) => setQuoteAmount(e.target.value)}
+              placeholder={quoteCoin}
+            />
+            <div className="relative h-1 bg-border/40 rounded-full">
+              <RangeSlider value={0} onChange={() => {}} min={0} max={100} showTicks />
+            </div>
+            <div className="text-xs text-foreground-muted text-center mt-1">
+              ≡ 0.00 {quoteCoin}
+            </div>
           </div>
         </div>
 
-        {/* Pay Section */}
-        <div className="px-4 mb-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-foreground-muted">Pay</span>
-            <span className="text-sm text-foreground-muted">Balance: ${balance.toFixed(2)} USDC</span>
-          </div>
-          <div className="flex items-center gap-2 p-3 bg-card rounded-lg border border-border">
+        {/* Strategy */}
+        <Fieldset label="Strategy">
+          <FormSelect
+            value={strategy}
+            onChange={(e) => setStrategy(e.target.value)}
+            options={STRATEGIES}
+          />
+        </Fieldset>
+
+        {/* Limit Price */}
+        <Fieldset label="Limit Price">
+          <div className="flex items-center gap-2">
             <input
               type="text"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.0"
-              className="flex-1 bg-transparent text-lg font-mono focus:outline-none"
+              value={limitPrice}
+              onChange={(e) => setLimitPrice(e.target.value)}
+              className="flex-1 bg-transparent text-sm font-mono focus:outline-none"
+              placeholder=""
             />
-            <button className="text-sm text-foreground-muted hover:text-foreground transition-colors">
-              MAX
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-background rounded-md">
-              <span className="text-sm font-medium">USDC</span>
-              <ChevronDownIcon className="w-4 h-4 text-foreground-muted" />
-            </button>
-          </div>
-        </div>
-
-        {/* Long/Short Asset Section */}
-        <div className="px-4 mb-4">
-          <div className="text-sm text-foreground-muted text-center mb-2">
-            {direction === 'long' ? 'Long' : direction === 'short' ? 'Short' : 'Swap'}
-          </div>
-          <div className="flex items-center justify-between p-3 bg-card rounded-lg border border-border">
-            <span className="text-base font-medium">{symbol}</span>
-            <button className="flex items-center gap-1.5 text-primary">
-              <span className="font-mono">${currentPrice.toLocaleString()}</span>
-              <ChevronDownIcon className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Leverage Section */}
-        <div className="px-4 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-foreground-muted">Leverage: {leverage}.0x</span>
-            <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium ${risk.bg} ${risk.color}`}>
-              <span className="w-1.5 h-1.5 rounded-full bg-current" />
-              {risk.label}
-            </span>
-          </div>
-
-          {/* Slider */}
-          <div className="relative mb-3">
-            <input
-              type="range"
-              min="1"
-              max="50"
-              value={leverage}
-              onChange={(e) => setLeverage(Number(e.target.value))}
-              className="w-full h-1 bg-border rounded-lg appearance-none cursor-pointer slider-thumb"
-            />
-          </div>
-
-          {/* Preset Buttons */}
-          <div className="grid grid-cols-4 gap-2">
-            {LEVERAGE_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                onClick={() => setLeverage(preset)}
-                className={`py-2 text-sm font-medium rounded-lg border transition-colors ${
-                  leverage === preset
-                    ? 'bg-blue-500 border-blue-500 text-white'
-                    : 'border-border text-foreground-muted hover:border-foreground-muted'
-                }`}
-              >
-                {preset}x
+            <div className="flex items-center gap-1">
+              <button className="p-1 text-foreground-muted hover:text-foreground">
+                <SortIcon className="w-4 h-4" />
               </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Margin Mode */}
-        <div className="px-4 mb-4">
-          <div className="text-sm text-foreground-muted text-center mb-2">Margin Mode</div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => setMarginMode('cross')}
-              className={`py-3 rounded-lg border transition-colors ${
-                marginMode === 'cross'
-                  ? 'bg-blue-500 border-blue-500 text-white'
-                  : 'border-border text-foreground-muted hover:border-foreground-muted'
-              }`}
-            >
-              <div className="text-sm font-medium">Cross</div>
-              <div className="text-xs opacity-70">Shares margin</div>
-            </button>
-            <button
-              onClick={() => setMarginMode('isolated')}
-              className={`py-3 rounded-lg border transition-colors ${
-                marginMode === 'isolated'
-                  ? 'bg-blue-500 border-blue-500 text-white'
-                  : 'border-border text-foreground-muted hover:border-foreground-muted'
-              }`}
-            >
-              <div className="text-sm font-medium">Isolated</div>
-              <div className="text-xs opacity-70">Position isolated</div>
-            </button>
-          </div>
-        </div>
-
-        {/* Pool Info */}
-        <div className="mx-4 mb-4 p-3 bg-card rounded-lg border border-border">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm text-foreground-muted">Pool</span>
-            <span className="text-sm font-medium">USDC-USDC</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-foreground-muted">Collateral In</span>
-            <span className="text-sm font-medium">USDC</span>
-          </div>
-        </div>
-
-        {/* Stop Loss / Take Profit */}
-        <div className="px-4 mb-4 space-y-2">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={stopLoss}
-              onChange={(e) => setStopLoss(e.target.checked)}
-              className="w-4 h-4 rounded border-border bg-transparent"
-            />
-            <StopLossIcon className="w-4 h-4 text-error" />
-            <span className="text-sm font-medium text-error">Stop Loss</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={takeProfit}
-              onChange={(e) => setTakeProfit(e.target.checked)}
-              className="w-4 h-4 rounded border-border bg-transparent"
-            />
-            <TakeProfitIcon className="w-4 h-4 text-success" />
-            <span className="text-sm font-medium text-success">Take Profit</span>
-          </label>
-        </div>
-
-        {/* Execution Details */}
-        <div className="px-4 mb-4">
-          <button
-            onClick={() => setShowExecutionDetails(!showExecutionDetails)}
-            className="flex items-center justify-between w-full py-2 text-sm text-foreground-muted hover:text-foreground transition-colors"
-          >
-            <span>Execution Details</span>
-            <ChevronDownIcon className={`w-4 h-4 transition-transform ${showExecutionDetails ? 'rotate-180' : ''}`} />
-          </button>
-          {showExecutionDetails && (
-            <div className="mt-2 p-3 bg-card rounded-lg border border-border text-xs space-y-2">
-              <div className="flex justify-between">
-                <span className="text-foreground-muted">Entry Price</span>
-                <span>${currentPrice.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-foreground-muted">Liquidation Price</span>
-                <span>--</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-foreground-muted">Fees</span>
-                <span>--</span>
-              </div>
+              <span className="px-2 py-1 bg-background-secondary text-xs rounded">Dynamic</span>
             </div>
-          )}
+          </div>
+        </Fieldset>
+
+        {/* Price Type & Options */}
+        <div className="flex items-center gap-4">
+          <RadioGroup
+            name="priceType"
+            options={PRICE_OPTIONS}
+            value={priceType}
+            onChange={setPriceType}
+          />
+          <Checkbox label="OOL Pause" checked={oolPause} onChange={setOolPause} />
+          <Checkbox label="Entry" checked={entry} onChange={setEntry} />
+        </div>
+
+        {/* Duration & Timezone */}
+        <div className="grid grid-cols-2 gap-3">
+          <FormInput
+            label="Duration (min)"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+          />
+          <FormSelect
+            label="Timezone"
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+            options={[
+              { value: 'Europe/London UTC+00:00', label: 'Europe/London UTC+00:00' },
+              { value: 'America/New_York UTC-05:00', label: 'America/New_York UTC-05:00' },
+              { value: 'Asia/Tokyo UTC+09:00', label: 'Asia/Tokyo UTC+09:00' },
+            ]}
+          />
+        </div>
+
+        {/* Time Start/End */}
+        <div className="grid grid-cols-2 gap-3">
+          <DateTimeInput
+            label="Time Start (Europe/London)"
+            value={startTime}
+            onChange={setStartTime}
+          />
+          <DateTimeInput
+            label="Time End (Europe/London)"
+            value={endTime}
+            onChange={setEndTime}
+          />
+        </div>
+
+        {/* Exit Conditions */}
+        <CollapsibleSection title="Exit Conditions">
+          {/* Take Profit */}
+          <Fieldset label="Take Profit" className="mb-4">
+            <DualInputRow
+              leftLabel="Take Profit %"
+              leftValue={takeProfitValue}
+              leftOnChange={setTakeProfitValue}
+              leftSuffix="%"
+              rightLabel="Take Profit Price"
+              rightValue={takeProfitPrice}
+              rightOnChange={setTakeProfitPrice}
+              rightSuffix="$"
+            />
+            <div className="flex justify-between text-xs text-foreground-muted mt-2">
+              <span>N/A Max Profit</span>
+              <span>N/A Chance of 24h Fill</span>
+            </div>
+            <div className="mt-3">
+              <div className="text-xs text-foreground-muted mb-2">Urgency</div>
+              <SegmentedControl
+                options={URGENCY_OPTIONS}
+                value={takeProfitUrgency}
+                onChange={setTakeProfitUrgency}
+              />
+            </div>
+          </Fieldset>
+
+          {/* Stop Loss */}
+          <Fieldset label="Stop Loss">
+            <DualInputRow
+              leftLabel="Stop Loss %"
+              leftValue={stopLossValue}
+              leftOnChange={setStopLossValue}
+              leftSuffix="%"
+              rightLabel="Stop Loss Price"
+              rightValue={stopLossPrice}
+              rightOnChange={setStopLossPrice}
+              rightSuffix="$"
+            />
+            <div className="flex justify-between text-xs text-foreground-muted mt-2">
+              <span>N/A Max Loss</span>
+              <span>N/A Chance of 24h Fill</span>
+            </div>
+            <div className="mt-3">
+              <div className="text-xs text-foreground-muted mb-2">Urgency</div>
+              <SegmentedControl
+                options={URGENCY_OPTIONS}
+                value={stopLossUrgency}
+                onChange={setStopLossUrgency}
+              />
+            </div>
+          </Fieldset>
+        </CollapsibleSection>
+
+        {/* Scale Orders */}
+        <CollapsibleSection title="Scale Orders">
+          <Fieldset label="Parameters" className="space-y-2">
+            <div className="flex items-center gap-2 text-xs text-foreground-muted">
+              <span className="w-4 h-4 bg-primary/20 rounded flex items-center justify-center text-primary">AI</span>
+              <span className="font-medium">Pre-Trade Analytics</span>
+            </div>
+            <InfoRow label="Participation Rate" value="-" />
+            <InfoRow label="Order Volatility" value="-" />
+            <InfoRow label="Market Volume" value="-" />
+          </Fieldset>
+        </CollapsibleSection>
+
+        {/* Templates */}
+        <div className="grid grid-cols-2 gap-3">
+          <ActionButton variant="outline">Save Templates</ActionButton>
+          <ActionButton variant="outline">Load Templates</ActionButton>
         </div>
       </div>
 
-      {/* Submit Button */}
-      <div className="p-4 border-t border-border">
-        <button
-          disabled={!amount}
-          className={`w-full py-3 rounded-lg text-sm font-semibold transition-colors ${
-            amount
-              ? direction === 'long'
-                ? 'bg-success text-black hover:bg-success/90'
-                : direction === 'short'
-                ? 'bg-error text-white hover:bg-error/90'
-                : 'bg-primary text-black hover:bg-primary/90'
-              : 'bg-card text-foreground-muted cursor-not-allowed'
-          }`}
+      {/* Submit Buttons */}
+      <div className="p-4 border-t border-border/40 space-y-2">
+        <ActionButton
+          variant={direction === 'buy' ? 'success' : 'error'}
+          disabled={!baseAmount && !quoteAmount}
         >
-          {amount ? `${direction === 'long' ? 'Long' : direction === 'short' ? 'Short' : 'Swap'} ${symbol}` : 'Enter an amount'}
-        </button>
+          Submit {direction === 'buy' ? 'Buy' : 'Sell'} Order
+        </ActionButton>
+        <ActionButton variant="outline" className="!text-success border-success/50">
+          Confirmation
+        </ActionButton>
       </div>
     </div>
   );
 }
 
 // Icons
-function PlusCircleIcon({ className }: { className?: string }) {
+function SortIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 8v8M8 12h8" />
-    </svg>
-  );
-}
-
-function SettingsIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
-function StopLossIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 8v4M12 16h.01" />
-    </svg>
-  );
-}
-
-function TakeProfitIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 6v6l4 2" />
+      <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
     </svg>
   );
 }
