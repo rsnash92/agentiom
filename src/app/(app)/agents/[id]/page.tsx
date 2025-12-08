@@ -3,13 +3,34 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { TVChart, PositionsTable, AgentSidebar, AgentRightPanel, AgentSwitcherBar, CreatePositionPanel, ChatPanel, AgentConfigPanel, PortfolioPanel, ToolsPanel, LogsPanel, NotificationsPanel, ApiKeysPanel } from '@/components/trading';
+import { TVChart, TIMEFRAMES, PositionsTable, AgentSidebar, AgentRightPanel, AgentSwitcherBar, CreatePositionPanel, ChatPanel, AgentConfigPanel, PortfolioPanel, ToolsPanel, LogsPanel, NotificationsPanel, ApiKeysPanel, MarketSelector } from '@/components/trading';
 import { useMarketData, useAgent, useAgents } from '@/lib/hooks';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AgentSetupChecklist, AgentSettingsPanel } from '@/components/agent';
 import { ResizablePanel } from '@/components/ui/ResizablePanel';
 
+// Format large numbers
+function formatVolume(value: number): string {
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+}
 
+// Format funding countdown
+function getFundingCountdown(): string {
+  const now = new Date();
+  const hours = now.getUTCHours();
+  const fundingHours = [0, 8, 16];
+  let nextFunding = fundingHours.find(h => h > hours) ?? 24;
+  if (nextFunding === 24) nextFunding = 0;
+
+  const hoursUntil = nextFunding > hours ? nextFunding - hours : (24 - hours + nextFunding);
+  const mins = 60 - now.getUTCMinutes();
+  const secs = 60 - now.getUTCSeconds();
+
+  return `${String(hoursUntil - 1).padStart(2, '0')}:${String(mins - 1).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
 
 function AgentTradingPageContent() {
   const params = useParams();
@@ -29,6 +50,7 @@ function AgentTradingPageContent() {
   const [activeTab, setActiveTab] = useState('tasks');
   const [selectedAgentId, setSelectedAgentId] = useState<string>(agentId || '');
   const [selectedCoin, setSelectedCoin] = useState('BTC');
+  const [showCoinDropdown, setShowCoinDropdown] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedTimeframe, setSelectedTimeframe] = useState('1h');
   const [showSetupChecklist, setShowSetupChecklist] = useState(false);
@@ -87,6 +109,10 @@ function AgentTradingPageContent() {
 
   // Derived values
   const currentPrice = marketData?.markPx ?? 0;
+  const priceChange = marketData?.priceChangePct24h ?? 0;
+  const volume24h = marketData?.volume24h ? formatVolume(marketData.volume24h) : '--';
+  const fundingRate = marketData?.funding ?? 0;
+  const fundingCountdown = getFundingCountdown();
 
   // Truncate wallet address helper
   const truncateAddress = (address: string) => {
@@ -203,6 +229,64 @@ function AgentTradingPageContent() {
           selectedAgentId={selectedAgentId}
           onSelectAgent={setSelectedAgentId}
         />
+
+        {/* Price Bar Panel */}
+        <div className="panel flex items-center justify-between px-4 py-2">
+          <div className="flex items-center gap-6">
+            {/* Symbol Selector */}
+            <MarketSelector
+              selectedCoin={selectedCoin}
+              onSelectCoin={setSelectedCoin}
+              isOpen={showCoinDropdown}
+              onClose={() => setShowCoinDropdown(false)}
+              onOpen={() => setShowCoinDropdown(true)}
+            />
+
+            {/* Quick Stats - Live Data */}
+            <div className="hidden lg:flex items-center gap-6 text-xs">
+              <div>
+                <span className="text-foreground-subtle">Price</span>
+                <span className="ml-2 font-mono text-foreground font-semibold">
+                  ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div>
+                <span className="text-foreground-subtle">24h</span>
+                <span className={`ml-2 font-mono ${priceChange >= 0 ? 'text-success' : 'text-error'}`}>
+                  {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
+                </span>
+              </div>
+              <div>
+                <span className="text-foreground-subtle">Vol</span>
+                <span className="ml-2 font-mono text-foreground">{volume24h}</span>
+              </div>
+              <div>
+                <span className="text-foreground-subtle">Fund</span>
+                <span className={`ml-2 font-mono ${fundingRate >= 0 ? 'text-success' : 'text-error'}`}>
+                  {fundingRate >= 0 ? '+' : ''}{fundingRate.toFixed(4)}%
+                </span>
+                <span className="ml-1 text-foreground-subtle">{fundingCountdown}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right side - Timeframe Selector */}
+          <div className="flex items-center gap-0.5 bg-background rounded p-0.5">
+            {TIMEFRAMES.map((tf) => (
+              <button
+                key={tf.value}
+                onClick={() => setSelectedTimeframe(tf.value)}
+                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                  selectedTimeframe === tf.value
+                    ? 'bg-background-secondary text-foreground'
+                    : 'text-foreground-muted hover:text-foreground'
+                }`}
+              >
+                {tf.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Chart Panel */}
         <div
