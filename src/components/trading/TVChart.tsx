@@ -106,11 +106,13 @@ function TVChartComponent({
             'header_compare',
             'display_market_status',
             'header_saveload',
+            'right_toolbar',
           ],
           enabled_features: [
             'study_templates',
             'use_localstorage_for_settings',
             'save_chart_properties_to_local_storage',
+            'hide_right_toolbar_by_default',
           ],
         });
 
@@ -132,18 +134,7 @@ function TVChartComponent({
   const containerId = `tradingview_${symbol.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0a] rounded-lg border border-border overflow-hidden relative">
-      {/* Header showing this is Hyperliquid data visualization */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">{coin}/USDC</span>
-          <span className="text-xs text-foreground-muted">Hyperliquid Perps</span>
-        </div>
-        <div className="text-xs text-foreground-subtle">
-          Chart: Binance {coin}USDT.P
-        </div>
-      </div>
-
+    <div className="flex flex-col h-full bg-[#0a0a0a] overflow-hidden relative">
       {/* TradingView Chart */}
       <div className="flex-1 min-h-[400px]">
         <div

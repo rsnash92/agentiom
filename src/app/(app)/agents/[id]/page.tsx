@@ -3,40 +3,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { TVChart, TIMEFRAMES, PositionsTable, AgentSidebar, AgentRightPanel, AgentSwitcherBar, CreatePositionPanel, ChatPanel, AgentConfigPanel, PortfolioPanel, ToolsPanel, LogsPanel, NotificationsPanel, SettingsPanel, ApiKeysPanel, MarketSelector } from '@/components/trading';
+import { TVChart, PositionsTable, AgentSidebar, AgentRightPanel, AgentSwitcherBar, CreatePositionPanel, ChatPanel, AgentConfigPanel, PortfolioPanel, ToolsPanel, LogsPanel, NotificationsPanel, ApiKeysPanel } from '@/components/trading';
 import { useMarketData, useAgent, useAgents } from '@/lib/hooks';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AgentSetupChecklist, AgentSettingsPanel } from '@/components/agent';
 import { ResizablePanel } from '@/components/ui/ResizablePanel';
 
-// Format large numbers
-function formatVolume(value: number): string {
-  if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-  if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
-  if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
-  return `$${value.toFixed(0)}`;
-}
 
-// Format funding countdown
-function getFundingCountdown(): string {
-  const now = new Date();
-  const hours = now.getUTCHours();
-  const fundingHours = [0, 8, 16];
-  let nextFunding = fundingHours.find(h => h > hours) ?? 24;
-  if (nextFunding === 24) nextFunding = 0;
-
-  const hoursUntil = nextFunding > hours ? nextFunding - hours : (24 - hours + nextFunding);
-  const mins = 60 - now.getUTCMinutes();
-  const secs = 60 - now.getUTCSeconds();
-
-  return `${String(hoursUntil - 1).padStart(2, '0')}:${String(mins - 1).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-// Truncate wallet address
-function truncateAddress(address: string): string {
-  if (!address) return '';
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
 
 function AgentTradingPageContent() {
   const params = useParams();
@@ -54,12 +27,10 @@ function AgentTradingPageContent() {
   const { agent, isLoading: agentLoading, error: agentError, toggleStatus } = useAgent(agentId);
 
   const [activeTab, setActiveTab] = useState('tasks');
-  const [showAIAnalysis, setShowAIAnalysis] = useState(false);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>(agentId || '');
   const [selectedCoin, setSelectedCoin] = useState('BTC');
-  const [showCoinDropdown, setShowCoinDropdown] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedTimeframe, setSelectedTimeframe] = useState('1h');
-  const [selectedAgentId, setSelectedAgentId] = useState<string>(agentId || '');
   const [showSetupChecklist, setShowSetupChecklist] = useState(false);
   const [checklistDismissed, setChecklistDismissed] = useState(false);
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -108,7 +79,7 @@ function AgentTradingPageContent() {
   }, []);
 
   // Fetch live market data
-  const { data: marketData, isLoading } = useMarketData({
+  const { data: marketData } = useMarketData({
     coin: selectedCoin,
     refreshInterval: 5000,
     enableWebSocket: true,
@@ -116,18 +87,20 @@ function AgentTradingPageContent() {
 
   // Derived values
   const currentPrice = marketData?.markPx ?? 0;
-  const priceChange = marketData?.priceChangePct24h ?? 0;
-  const volume24h = marketData?.volume24h ? formatVolume(marketData.volume24h) : '--';
-  const fundingRate = marketData?.funding ?? 0;
-  const fundingCountdown = getFundingCountdown();
+
+  // Truncate wallet address helper
+  const truncateAddress = (address: string) => {
+    if (!address) return '';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
 
   // Transform agents for switcher bar
   const agentsForSwitcher = allAgents.map(a => ({
     id: a.id,
     name: a.name,
     address: truncateAddress(a.walletAddress),
-    totalBalance: 0, // TODO: Fetch from Hyperliquid
-    unrealizedPnl: 0, // TODO: Fetch from Hyperliquid
+    totalBalance: 0,
+    unrealizedPnl: 0,
     status: a.status as 'active' | 'paused',
   }));
 
@@ -230,95 +203,6 @@ function AgentTradingPageContent() {
           selectedAgentId={selectedAgentId}
           onSelectAgent={setSelectedAgentId}
         />
-        {/* Top Price Bar Panel */}
-        <div className="panel flex items-center justify-between px-4 py-2">
-          <div className="flex items-center gap-6">
-            {/* Back Button */}
-            <Link href="/agents" className="p-1.5 rounded hover:bg-background-secondary text-foreground-muted hover:text-foreground">
-              <BackIcon className="w-4 h-4" />
-            </Link>
-
-            {/* Symbol Selector */}
-            <MarketSelector
-              selectedCoin={selectedCoin}
-              onSelectCoin={setSelectedCoin}
-              isOpen={showCoinDropdown}
-              onClose={() => setShowCoinDropdown(false)}
-              onOpen={() => setShowCoinDropdown(true)}
-            />
-
-            {/* Quick Stats - Live Data */}
-            <div className="hidden lg:flex items-center gap-6 text-xs">
-              <div>
-                <span className="text-foreground-subtle">Price</span>
-                <span className="ml-2 font-mono text-foreground font-semibold">
-                  {isLoading ? '--' : `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-                </span>
-              </div>
-              <div>
-                <span className="text-foreground-subtle">24h</span>
-                <span className={`ml-2 font-mono ${priceChange >= 0 ? 'text-success' : 'text-error'}`}>
-                  {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
-                </span>
-              </div>
-              <div>
-                <span className="text-foreground-subtle">Vol</span>
-                <span className="ml-2 font-mono text-foreground">{volume24h}</span>
-              </div>
-              <div>
-                <span className="text-foreground-subtle">Fund</span>
-                <span className={`ml-2 font-mono ${fundingRate >= 0 ? 'text-success' : 'text-error'}`}>
-                  {fundingRate >= 0 ? '+' : ''}{fundingRate.toFixed(4)}%
-                </span>
-                <span className="ml-1 text-foreground-subtle">{fundingCountdown}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right side actions */}
-          <div className="flex items-center gap-3">
-            {/* Agent Status Toggle */}
-            <button
-              onClick={toggleStatus}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                agent.status === 'active'
-                  ? 'bg-success/10 text-success hover:bg-success/20'
-                  : 'bg-warning/10 text-warning hover:bg-warning/20'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${agent.status === 'active' ? 'bg-success animate-pulse' : 'bg-warning'}`} />
-              {agent.status === 'active' ? 'Running' : 'Paused'}
-            </button>
-
-            {/* Timeframe Selector */}
-            <div className="flex items-center gap-0.5 bg-background rounded p-0.5">
-              {TIMEFRAMES.map((tf) => (
-                <button
-                  key={tf.value}
-                  onClick={() => setSelectedTimeframe(tf.value)}
-                  className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                    selectedTimeframe === tf.value
-                      ? 'bg-background-secondary text-foreground'
-                      : 'text-foreground-muted hover:text-foreground'
-                  }`}
-                >
-                  {tf.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setShowAIAnalysis(!showAIAnalysis)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                showAIAnalysis
-                  ? 'bg-primary text-black'
-                  : 'bg-background-secondary hover:bg-background-tertiary text-foreground'
-              }`}
-            >
-              <SparklesIcon className="w-4 h-4" />
-              AI Analysis
-            </button>
-          </div>
-        </div>
 
         {/* Chart Panel */}
         <div
@@ -427,15 +311,6 @@ function BackIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M19 12H5M12 19l-7-7 7-7" />
-    </svg>
-  );
-}
-
-function SparklesIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z" />
-      <path d="M5 3v4M3 5h4M19 17v4M17 19h4" />
     </svg>
   );
 }
