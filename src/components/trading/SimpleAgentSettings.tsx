@@ -20,11 +20,13 @@ const SYMBOLS = [
 ];
 
 export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsProps) {
-  const { agent, updateAgent } = useAgent(agentId);
+  const { agent, updateAgent, executeOnce } = useAgent(agentId);
 
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>(['BTC', 'ETH', 'SOL']);
   const [prompt, setPrompt] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executeResult, setExecuteResult] = useState<string | null>(null);
 
   // Load agent data
   useEffect(() => {
@@ -64,6 +66,23 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleRunNow = async () => {
+    setIsExecuting(true);
+    setExecuteResult(null);
+    try {
+      const result = await executeOnce();
+      if (result) {
+        setExecuteResult(`Executed ${result.results?.length || 0} decisions`);
+      } else {
+        setExecuteResult('Execution failed - check console');
+      }
+    } catch (error) {
+      setExecuteResult(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsExecuting(false);
     }
   };
 
@@ -129,6 +148,32 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
             </span>
           </div>
         </div>
+
+        {/* Run Now Button */}
+        <div className="pt-2">
+          <button
+            onClick={handleRunNow}
+            disabled={isExecuting}
+            className="w-full py-3 bg-success/20 text-success font-semibold rounded-lg hover:bg-success/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center gap-2"
+          >
+            {isExecuting ? (
+              <>
+                <span className="w-4 h-4 border-2 border-success border-t-transparent rounded-full animate-spin" />
+                Analyzing Markets...
+              </>
+            ) : (
+              <>
+                <PlayIcon className="w-4 h-4" />
+                RUN NOW
+              </>
+            )}
+          </button>
+          {executeResult && (
+            <p className={`text-xs mt-2 text-center ${executeResult.includes('Error') ? 'text-error' : 'text-foreground-muted'}`}>
+              {executeResult}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Footer */}
@@ -164,6 +209,14 @@ function CheckboxIcon({ checked, className }: { checked: boolean; className?: st
     <svg className={className || 'w-4 h-4'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <rect x="3" y="3" width="18" height="18" rx="2" />
       {checked && <path d="M9 12l2 2 4-4" />}
+    </svg>
+  );
+}
+
+function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5v14l11-7z" />
     </svg>
   );
 }
