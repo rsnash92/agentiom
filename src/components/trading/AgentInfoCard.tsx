@@ -88,9 +88,21 @@ export function AgentInfoCard({
         {/* Details link */}
         <Link
           href={`/agents/${agentId}/details`}
-          className="text-[10px] text-primary hover:text-primary/80 font-medium ml-1"
+          className="text-[10px] text-foreground-muted hover:text-foreground font-medium ml-1"
         >
           DETAILS
+        </Link>
+
+        {/* Spacer to push New Agent to far right */}
+        <div className="flex-1" />
+
+        {/* New Agent link */}
+        <Link
+          href="/agents/new"
+          className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium"
+        >
+          <PlusIcon className="w-3 h-3" />
+          NEW AGENT
         </Link>
       </div>
     </div>
@@ -102,6 +114,14 @@ function AgentIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="12" cy="8" r="4" />
       <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+    </svg>
+  );
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 5v14M5 12h14" />
     </svg>
   );
 }
