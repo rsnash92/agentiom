@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePrivy } from '@privy-io/react-auth';
 
@@ -34,19 +34,6 @@ export function AgentInfoCard({
   const { getAccessToken } = usePrivy();
   const [currentBalance, setCurrentBalance] = useState(initialBalance);
   const [unrealizedPnl, setUnrealizedPnl] = useState(0);
-  const [showAgentDropdown, setShowAgentDropdown] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowAgentDropdown(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Reset balance when initialBalance prop changes (e.g. agent switch)
   useEffect(() => {
@@ -89,59 +76,43 @@ export function AgentInfoCard({
     };
   }, [agentId, getAccessToken]);
 
+  // Combine current agent with other agents for tabs
+  const allAgents = [
+    { id: agentId, name: agentName, status },
+    ...otherAgents.filter(a => a.id !== agentId)
+  ];
+
   return (
-    <div className="panel px-3 sm:px-4 py-2 flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-4">
-      {/* Agent avatar/icon */}
-      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-        <AgentIcon className="w-4 h-4 text-primary" />
+    <div className="panel px-2 sm:px-4 py-2 flex items-center gap-2 sm:gap-4">
+      {/* Agent Tabs - side by side */}
+      <div className="flex items-center gap-1 overflow-x-auto flex-shrink-0">
+        {allAgents.map((agent) => (
+          <button
+            key={agent.id}
+            onClick={() => agent.id !== agentId && onSelectAgent?.(agent.id)}
+            className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+              agent.id === agentId
+                ? 'bg-primary/20 text-primary'
+                : 'text-foreground-muted hover:text-foreground hover:bg-background-secondary'
+            }`}
+          >
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+              agent.status === 'active' ? 'bg-success' : 'bg-foreground-subtle'
+            }`} />
+            <span className="truncate max-w-[80px] sm:max-w-none">{agent.name}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Agent name and balance with dropdown */}
-      <div className="min-w-0 relative flex-1 sm:flex-none" ref={dropdownRef}>
-        <button
-          onClick={() => otherAgents.length > 0 && setShowAgentDropdown(!showAgentDropdown)}
-          className={`flex items-center gap-1 text-sm font-medium text-foreground truncate ${otherAgents.length > 0 ? 'hover:text-primary cursor-pointer' : ''}`}
-        >
-          {agentName}
-          {otherAgents.length > 0 && (
-            <ChevronDownIcon className={`w-3 h-3 transition-transform ${showAgentDropdown ? 'rotate-180' : ''}`} />
-          )}
-        </button>
-        <div className="flex items-baseline gap-2">
-          <span className="text-sm sm:text-base font-bold text-foreground">
-            ${currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      {/* Balance display */}
+      <div className="flex items-baseline gap-2 min-w-0">
+        <span className="text-sm sm:text-base font-bold text-foreground">
+          ${currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        {unrealizedPnl !== 0 && (
+          <span className={`text-xs font-medium ${unrealizedPnl >= 0 ? 'text-success' : 'text-error'}`}>
+            {unrealizedPnl >= 0 ? '+' : ''}{unrealizedPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
-          {unrealizedPnl !== 0 && (
-            <span className={`text-xs font-medium ${unrealizedPnl >= 0 ? 'text-success' : 'text-error'}`}>
-              {unrealizedPnl >= 0 ? '+' : ''}{unrealizedPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          )}
-        </div>
-
-        {/* Agent Dropdown */}
-        {showAgentDropdown && otherAgents.length > 0 && (
-          <div className="absolute top-full left-0 mt-1 z-50 bg-background-secondary border border-border rounded-lg shadow-lg py-1 min-w-[180px]">
-            {otherAgents.map((agent) => (
-              <button
-                key={agent.id}
-                onClick={() => {
-                  onSelectAgent?.(agent.id);
-                  setShowAgentDropdown(false);
-                }}
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-background-tertiary transition-colors flex items-center gap-2 ${
-                  agent.id === agentId ? 'text-primary font-medium' : 'text-foreground'
-                }`}
-              >
-                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                  agent.status === 'active' ? 'bg-success' : 'bg-foreground-subtle'
-                }`} />
-                <span className="truncate">{agent.name}</span>
-                {agent.id === agentId && (
-                  <CheckIcon className="w-3 h-3 ml-auto flex-shrink-0" />
-                )}
-              </button>
-            ))}
-          </div>
         )}
       </div>
 
@@ -174,10 +145,10 @@ export function AgentInfoCard({
           {isDemo ? 'DEMO' : 'LIVE'}
         </span>
 
-        {/* Details link - hide on very small screens */}
+        {/* Details link */}
         <Link
           href={`/agents/${agentId}/details`}
-          className="hidden xs:inline text-[9px] sm:text-[10px] text-foreground-muted hover:text-foreground font-medium"
+          className="text-[9px] sm:text-[10px] text-foreground-muted hover:text-foreground font-medium"
         >
           DETAILS
         </Link>
@@ -212,18 +183,3 @@ function PlusIcon({ className }: { className?: string }) {
   );
 }
 
-function ChevronDownIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M20 6L9 17l-5-5" />
-    </svg>
-  );
-}
