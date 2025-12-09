@@ -118,11 +118,11 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data;
 
-    // Skip invite code validation in development
-    const isDev = process.env.NODE_ENV === 'development';
+    // Skip invite code validation in development or when disabled via env var
+    const skipInviteValidation = process.env.NODE_ENV === 'development' || process.env.SKIP_INVITE_VALIDATION === 'true';
     let validatedInviteCode: string | null = null;
 
-    if (!isDev) {
+    if (!skipInviteValidation) {
       // Invite code is required for both demo and live trading
       if (!data.inviteCode) {
         return NextResponse.json(
