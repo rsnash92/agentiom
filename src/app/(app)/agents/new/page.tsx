@@ -14,7 +14,7 @@ const MODELS = [
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', icon: '🟡' },
 ];
 
-// Available trading pairs
+// Available trading pairs (matching screenshot)
 const SYMBOLS = [
   { id: 'BTC', name: 'BTC/USDT' },
   { id: 'ETH', name: 'ETH/USDT' },
@@ -22,7 +22,7 @@ const SYMBOLS = [
   { id: 'BNB', name: 'BNB/USDT' },
   { id: 'DOGE', name: 'DOGE/USDT' },
   { id: 'XRP', name: 'XRP/USDT' },
-  { id: 'ARB', name: 'ARB/USDT' },
+  { id: 'ASTER', name: 'ASTER/USDT' },
   { id: 'HYPE', name: 'HYPE/USDT' },
 ];
 
@@ -60,9 +60,9 @@ function CreateAgentModal() {
   // Suppress unused variable warning
   void isValidatingCode;
 
-  // Validate invite code
+  // Validate invite code (required for both demo and live)
   useEffect(() => {
-    if (tradingMode === 'live' && inviteCode.length >= 4) {
+    if (inviteCode.length >= 4) {
       const validateCode = async () => {
         setIsValidatingCode(true);
         setInviteCodeError(null);
@@ -90,7 +90,7 @@ function CreateAgentModal() {
       setInviteCodeValid(null);
       setInviteCodeError(null);
     }
-  }, [inviteCode, tradingMode]);
+  }, [inviteCode]);
 
   const toggleSymbol = (symbol: string) => {
     setSelectedSymbols(prev =>
@@ -124,8 +124,8 @@ function CreateAgentModal() {
       return;
     }
 
-    if (tradingMode === 'live' && !inviteCodeValid) {
-      setError('Please enter a valid invite code for live trading');
+    if (!inviteCodeValid) {
+      setError('Please enter a valid invite code');
       return;
     }
 
@@ -137,7 +137,7 @@ function CreateAgentModal() {
         name: name.trim(),
         prompt: prompt.trim() || undefined,
         isDemo: tradingMode === 'demo',
-        inviteCode: tradingMode === 'live' ? inviteCode : undefined,
+        inviteCode: inviteCode,
         model: selectedModel,
         approvedPairs: selectedSymbols,
         policies: {
@@ -208,71 +208,67 @@ function CreateAgentModal() {
               </button>
             </div>
 
-            {/* Invite Code Section (for live trading) */}
-            {tradingMode === 'live' && (
-              <>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setHasInviteCode(true)}
-                    className={`py-2.5 px-4 rounded-lg text-xs font-medium transition-all ${
-                      hasInviteCode
-                        ? 'bg-primary/20 border-2 border-primary text-primary'
-                        : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
+            {/* Invite Code Section (required for both demo and live) */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setHasInviteCode(true)}
+                className={`py-2.5 px-4 rounded-lg text-xs font-medium transition-all ${
+                  hasInviteCode
+                    ? 'bg-primary/20 border-2 border-primary text-primary'
+                    : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
+                }`}
+              >
+                I HAVE<br />INVITATION CODE
+              </button>
+              <button
+                onClick={() => setHasInviteCode(false)}
+                className={`py-2.5 px-4 rounded-lg text-xs font-medium transition-all ${
+                  !hasInviteCode
+                    ? 'bg-primary/20 border-2 border-primary text-primary'
+                    : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
+                }`}
+              >
+                I DO NOT HAVE<br />INVITATION CODE
+              </button>
+            </div>
+
+            {hasInviteCode ? (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="text-sm text-foreground-muted">Invitation Code*</label>
+                  <HelpIcon className="w-4 h-4 text-foreground-subtle" />
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    placeholder="ENTER INVITATION CODE"
+                    className={`w-full px-4 py-3 bg-background border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none uppercase tracking-wider ${
+                      inviteCodeValid === true
+                        ? 'border-success'
+                        : inviteCodeValid === false
+                        ? 'border-error'
+                        : 'border-border focus:border-primary'
                     }`}
-                  >
-                    I HAVE<br />INVITATION CODE
-                  </button>
-                  <button
-                    onClick={() => setHasInviteCode(false)}
-                    className={`py-2.5 px-4 rounded-lg text-xs font-medium transition-all ${
-                      !hasInviteCode
-                        ? 'bg-primary/20 border-2 border-primary text-primary'
-                        : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
-                    }`}
-                  >
-                    I DO NOT HAVE<br />INVITATION CODE
+                  />
+                  <button className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground">
+                    <CopyIcon className="w-4 h-4" />
                   </button>
                 </div>
-
-                {hasInviteCode ? (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <label className="text-sm text-foreground-muted">Invitation Code*</label>
-                      <HelpIcon className="w-4 h-4 text-foreground-subtle" />
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={inviteCode}
-                        onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                        placeholder="ENTER INVITATION CODE"
-                        className={`w-full px-4 py-3 bg-background border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none uppercase tracking-wider ${
-                          inviteCodeValid === true
-                            ? 'border-success'
-                            : inviteCodeValid === false
-                            ? 'border-error'
-                            : 'border-border focus:border-primary'
-                        }`}
-                      />
-                      <button className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground">
-                        <CopyIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                    {inviteCodeError && (
-                      <p className="text-xs text-error mt-1">{inviteCodeError}</p>
-                    )}
-                    {inviteCodeValid && (
-                      <p className="text-xs text-success mt-1">Valid invitation code</p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
-                    <p className="text-sm text-warning">
-                      An invitation code is required for live trading. Join our Discord to request one.
-                    </p>
-                  </div>
+                {inviteCodeError && (
+                  <p className="text-xs text-error mt-1">{inviteCodeError}</p>
                 )}
-              </>
+                {inviteCodeValid && (
+                  <p className="text-xs text-success mt-1">Valid invitation code</p>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                <p className="text-sm text-warning">
+                  An invitation code is required to create an agent. Join our Discord to request one.
+                </p>
+              </div>
             )}
 
             {/* Agent Name */}
@@ -428,7 +424,7 @@ function CreateAgentModal() {
           <div className="px-6 py-4 border-t border-border">
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting || (tradingMode === 'live' && !inviteCodeValid)}
+              disabled={isSubmitting || !inviteCodeValid}
               className="w-full py-3.5 bg-primary text-black font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all tracking-wide"
             >
               {isSubmitting ? 'CREATING...' : 'CREATE AGENT'}
