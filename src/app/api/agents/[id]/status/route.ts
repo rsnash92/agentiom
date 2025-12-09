@@ -128,10 +128,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     if (action === 'start') {
-      // Verify agent has required config
-      if (!agent.apiKeyEncrypted) {
+      // For live trading, verify wallet is configured
+      // Demo agents don't need a real wallet
+      if (!agent.isDemo && !agent.apiKeyEncrypted) {
         return NextResponse.json(
-          { error: 'Agent wallet not configured' },
+          { error: 'Agent wallet not configured for live trading' },
           { status: 400 }
         );
       }
