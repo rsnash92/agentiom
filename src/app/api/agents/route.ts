@@ -217,8 +217,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ agent: newAgent }, { status: 201 });
   } catch (error) {
     console.error('Failed to create agent:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to create agent' },
+      { error: 'Failed to create agent', details: errorMessage },
       { status: 500 }
     );
   }

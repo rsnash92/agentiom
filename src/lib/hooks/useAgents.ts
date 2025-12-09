@@ -130,7 +130,10 @@ export function useAgents() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create agent');
+        const errorMsg = errorData.details
+          ? `${errorData.error}: ${errorData.details}`
+          : errorData.error || 'Failed to create agent';
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
