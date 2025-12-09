@@ -20,6 +20,7 @@ interface Order {
   filledAmount: number;
   leverage: number;
   timestamp: Date;
+  realizedPnl?: number;
 }
 
 interface ChatMessage {
@@ -83,19 +84,26 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
 
       if (response.ok) {
         const data = await response.json();
-        setOrders(data.orders.map((order: {
-          id: string;
-          action: string;
-          symbol: string;
-          price: number;
-          quantity: number;
-          filledAmount: number;
-          leverage: number;
-          timestamp: string;
-        }) => ({
-          ...order,
-          timestamp: new Date(order.timestamp),
-        })));
+        // Filter out empty/failed orders (price $0 or quantity 0)
+        const validOrders = data.orders
+          .filter((order: { price: number; quantity: number; filledAmount: number }) =>
+            order.price > 0 && (order.quantity > 0 || order.filledAmount > 0)
+          )
+          .map((order: {
+            id: string;
+            action: string;
+            symbol: string;
+            price: number;
+            quantity: number;
+            filledAmount: number;
+            leverage: number;
+            timestamp: string;
+            realizedPnl?: number;
+          }) => ({
+            ...order,
+            timestamp: new Date(order.timestamp),
+          }));
+        setOrders(validOrders);
       }
     } catch (error) {
       console.error('Failed to fetch orders:', error);
@@ -292,7 +300,7 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
                         </div>
 
                         {/* Order Stats */}
-                        <div className="grid grid-cols-4 gap-4 text-xs">
+                        <div className="grid grid-cols-5 gap-4 text-xs">
                           <div>
                             <span className="text-foreground-subtle">Price:</span>
                             <span className="ml-2 text-foreground font-medium">${order.price.toLocaleString()}</span>
@@ -309,6 +317,14 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
                             <span className="text-foreground-subtle">Leverage:</span>
                             <span className="ml-2 text-foreground font-medium">{order.leverage}x</span>
                           </div>
+                          {order.realizedPnl !== undefined && order.action === 'CLOSE' && (
+                            <div>
+                              <span className="text-foreground-subtle">P&L:</span>
+                              <span className={`ml-2 font-medium ${order.realizedPnl >= 0 ? 'text-success' : 'text-error'}`}>
+                                {order.realizedPnl >= 0 ? '+' : ''}${order.realizedPnl.toFixed(2)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

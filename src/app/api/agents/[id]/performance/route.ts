@@ -201,15 +201,6 @@ export async function GET(
       }
     }
 
-    // Always add current point
-    dataPoints.push({
-      timestamp: Date.now(),
-      value: currentBalance,
-    });
-
-    // Interpolate to get smooth chart data
-    const smoothDataPoints = interpolateDataPoints(dataPoints, 100);
-
     // Calculate unrealized P&L from open positions
     const openPositions = await db
       .select()
@@ -224,13 +215,30 @@ export async function GET(
       unrealizedPnl += parseFloat(pos.unrealizedPnl || '0');
     }
 
+    // Get the actual current balance from the latest data point
+    // If we have snapshots, use the latest; otherwise use demoBalance
+    let actualCurrentBalance = currentBalance;
+    if (dataPoints.length > 0) {
+      // Use the last data point value as the current balance
+      actualCurrentBalance = dataPoints[dataPoints.length - 1].value;
+    }
+
+    // Add current point with unrealized P&L factored in
+    dataPoints.push({
+      timestamp: Date.now(),
+      value: actualCurrentBalance + unrealizedPnl,
+    });
+
+    // Interpolate to get smooth chart data
+    const smoothDataPoints = interpolateDataPoints(dataPoints, 100);
+
     // Calculate total P&L
-    const totalPnl = currentBalance - initialBalance + unrealizedPnl;
+    const totalPnl = actualCurrentBalance - initialBalance + unrealizedPnl;
     const pnlPct = (totalPnl / initialBalance) * 100;
 
     return NextResponse.json({
       initialBalance,
-      currentBalance,
+      currentBalance: actualCurrentBalance,
       unrealizedPnl,
       totalPnl,
       pnlPct,
