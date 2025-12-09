@@ -1,6 +1,8 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { usePrivy } from '@privy-io/react-auth';
 
 interface AgentInfoCardProps {
   agentId: string;
@@ -14,11 +16,37 @@ interface AgentInfoCardProps {
 export function AgentInfoCard({
   agentId,
   agentName,
-  balance,
+  balance: initialBalance,
   status,
   isDemo,
   onToggleStatus,
 }: AgentInfoCardProps) {
+  const { getAccessToken } = usePrivy();
+  const [currentBalance, setCurrentBalance] = useState(initialBalance);
+
+  // Fetch real-time balance from performance API
+  const fetchBalance = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`/api/agents/${agentId}/performance`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentBalance(data.currentBalance || initialBalance);
+      }
+    } catch (error) {
+      console.error('Failed to fetch balance:', error);
+    }
+  }, [agentId, getAccessToken, initialBalance]);
+
+  // Fetch on mount and every 10 seconds
+  useEffect(() => {
+    fetchBalance();
+    const interval = setInterval(fetchBalance, 10000);
+    return () => clearInterval(interval);
+  }, [fetchBalance]);
+
   return (
     <div className="panel px-4 py-2 flex items-center gap-4">
       {/* Agent avatar/icon */}
@@ -30,7 +58,7 @@ export function AgentInfoCard({
       <div className="min-w-0">
         <h2 className="text-sm font-medium text-foreground truncate">{agentName}</h2>
         <div className="text-base font-bold text-foreground">
-          {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       </div>
 
@@ -59,7 +87,7 @@ export function AgentInfoCard({
 
         {/* Details link */}
         <Link
-          href={`/agents/${agentId}/settings`}
+          href={`/agents/${agentId}/details`}
           className="text-[10px] text-primary hover:text-primary/80 font-medium ml-1"
         >
           DETAILS
