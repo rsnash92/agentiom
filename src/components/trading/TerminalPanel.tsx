@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { usePrivy } from '@privy-io/react-auth';
 
 interface TerminalPanelProps {
   agentId: string;
@@ -12,7 +13,7 @@ type TabType = 'orders' | 'chat' | 'positions';
 interface Order {
   id: string;
   agentName: string;
-  action: 'BUY' | 'SELL';
+  action: 'BUY' | 'SELL' | 'CLOSE';
   symbol: string;
   price: number;
   quantity: number;
@@ -34,6 +35,7 @@ interface Position {
   symbol: string;
   side: 'LONG' | 'SHORT';
   size: number;
+  sizeUsd: number;
   entryPrice: number;
   markPrice: number;
   pnl: number;
@@ -51,69 +53,144 @@ const SYMBOL_COLORS: Record<string, string> = {
   XRP: '#23292F',
   HYPE: '#00D4AA',
   ASTER: '#FF6B6B',
+  AVAX: '#E84142',
+  LINK: '#2A5ADA',
+  ARB: '#12AAFF',
+  OP: '#FF0420',
+  MATIC: '#8247E5',
+  ATOM: '#2E3148',
+  APT: '#00CBC6',
+  SUI: '#6FBCF0',
 };
 
-// Mock data for demonstration
-const mockOrders: Order[] = [
-  {
-    id: '1',
-    agentName: 'AGENT',
-    action: 'BUY',
-    symbol: 'SOL',
-    price: 141.38,
-    quantity: 1.4,
-    filledAmount: 197.93,
-    leverage: 8,
-    timestamp: new Date(Date.now() - 60000),
-  },
-  {
-    id: '2',
-    agentName: 'AGENT',
-    action: 'BUY',
-    symbol: 'BNB',
-    price: 917.6,
-    quantity: 0.12,
-    filledAmount: 110.11,
-    leverage: 8,
-    timestamp: new Date(Date.now() - 120000),
-  },
-  {
-    id: '3',
-    agentName: 'AGENT',
-    action: 'BUY',
-    symbol: 'ETH',
-    price: 3293.29,
-    quantity: 0.15,
-    filledAmount: 493.99,
-    leverage: 8,
-    timestamp: new Date(Date.now() - 180000),
-  },
-];
-
-const mockMessages: ChatMessage[] = [
-  {
-    id: '1',
-    agentName: 'AGENT',
-    content: 'Reduce outsized risk and correlation: close BTC and BNB shorts to lock gains and cut exposure; hold SOL short with existing exit plan. Market: 4H bearish, short-term bounce in BTC. Sharpe good; prioritize disciplined de-risking.',
-    timestamp: new Date(Date.now() - 3600000),
-    isExpanded: false,
-  },
-  {
-    id: '2',
-    agentName: 'AGENT',
-    content: 'De-risk immediately: close BTC and BNB shorts to bring exposure within the 80% cap and lock in BTC gains/cut BNB loss. Maintain SOL short with the existing tight stop and target since 4H trend remains bearish and intraday momentum is stalling. No new trades.',
-    timestamp: new Date(Date.now() - 7200000),
-    isExpanded: false,
-  },
-];
-
-const mockPositions: Position[] = [];
-
-export function TerminalPanel({ agentName }: TerminalPanelProps) {
+export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
+  const { getAccessToken } = usePrivy();
   const [activeTab, setActiveTab] = useState<TabType>('orders');
-  const [messages, setMessages] = useState<ChatMessage[]>(mockMessages);
-  const [orders] = useState<Order[]>(mockOrders);
-  const [positions] = useState<Position[]>(mockPositions);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch orders from API
+  const fetchOrders = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`/api/agents/${agentId}/orders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setOrders(data.orders.map((order: {
+          id: string;
+          action: string;
+          symbol: string;
+          price: number;
+          quantity: number;
+          filledAmount: number;
+          leverage: number;
+          timestamp: string;
+        }) => ({
+          ...order,
+          timestamp: new Date(order.timestamp),
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to fetch orders:', error);
+    }
+  }, [agentId, getAccessToken]);
+
+  // Fetch positions from API
+  const fetchPositions = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`/api/agents/${agentId}/positions`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setPositions(data.open.map((pos: {
+          id: string;
+          symbol: string;
+          side: 'LONG' | 'SHORT';
+          size: number;
+          sizeUsd: number;
+          entryPrice: number;
+          markPrice: number;
+          unrealizedPnl: number;
+          pnlPct: number;
+          leverage: number;
+        }) => ({
+          id: pos.id,
+          symbol: pos.symbol,
+          side: pos.side,
+          size: pos.size,
+          sizeUsd: pos.sizeUsd,
+          entryPrice: pos.entryPrice,
+          markPrice: pos.markPrice,
+          pnl: pos.unrealizedPnl,
+          pnlPct: pos.pnlPct,
+          leverage: pos.leverage,
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to fetch positions:', error);
+    }
+  }, [agentId, getAccessToken]);
+
+  // Fetch chat messages (analysis logs) from API
+  const fetchMessages = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`/api/agents/${agentId}/logs?type=analysis`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data.logs.map((log: {
+          id: string;
+          content: string;
+          timestamp: string;
+        }) => ({
+          id: log.id,
+          agentName: agentName,
+          content: log.content,
+          timestamp: new Date(log.timestamp),
+          isExpanded: false,
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
+    }
+  }, [agentId, agentName, getAccessToken]);
+
+  // Initial data fetch
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      await Promise.all([fetchOrders(), fetchPositions(), fetchMessages()]);
+      setIsLoading(false);
+    }
+    loadData();
+  }, [fetchOrders, fetchPositions, fetchMessages]);
+
+  // Refresh data periodically (every 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOrders();
+      fetchPositions();
+      fetchMessages();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fetchOrders, fetchPositions, fetchMessages]);
 
   const toggleMessageExpand = (id: string) => {
     setMessages(prev =>
@@ -159,8 +236,15 @@ export function TerminalPanel({ agentName }: TerminalPanelProps) {
 
       {/* Tab Content */}
       <div className="flex-1 overflow-auto">
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+
         {/* Order History Tab */}
-        {activeTab === 'orders' && (
+        {activeTab === 'orders' && !isLoading && (
           <div className="divide-y divide-border">
             {orders.length === 0 ? (
               <div className="p-4">
@@ -186,14 +270,20 @@ export function TerminalPanel({ agentName }: TerminalPanelProps) {
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-primary">{agentName.toUpperCase()}</span>
-                            <span className="text-xs text-foreground-muted">placed a</span>
-                            <span className={`text-xs font-semibold ${order.action === 'BUY' ? 'text-success' : 'text-error'}`}>
-                              {order.action}
+                            <span className="text-xs text-foreground-muted">
+                              {order.action === 'CLOSE' ? 'closed position on' : 'placed a'}
                             </span>
-                            <span className="text-xs text-foreground-muted">order on</span>
+                            {order.action !== 'CLOSE' && (
+                              <>
+                                <span className={`text-xs font-semibold ${order.action === 'BUY' ? 'text-success' : 'text-error'}`}>
+                                  {order.action}
+                                </span>
+                                <span className="text-xs text-foreground-muted">order on</span>
+                              </>
+                            )}
                             <span
                               className="text-xs font-medium px-1.5 py-0.5 rounded"
-                              style={{ backgroundColor: `${SYMBOL_COLORS[order.symbol]}20`, color: SYMBOL_COLORS[order.symbol] }}
+                              style={{ backgroundColor: `${SYMBOL_COLORS[order.symbol]}20`, color: SYMBOL_COLORS[order.symbol] || '#666' }}
                             >
                               {order.symbol}
                             </span>
@@ -205,15 +295,15 @@ export function TerminalPanel({ agentName }: TerminalPanelProps) {
                         <div className="grid grid-cols-4 gap-4 text-xs">
                           <div>
                             <span className="text-foreground-subtle">Price:</span>
-                            <span className="ml-2 text-foreground font-medium">{order.price.toLocaleString()}</span>
+                            <span className="ml-2 text-foreground font-medium">${order.price.toLocaleString()}</span>
                           </div>
                           <div>
                             <span className="text-foreground-subtle">Quantity:</span>
                             <span className="ml-2 text-foreground font-medium">{order.quantity.toFixed(4)}</span>
                           </div>
                           <div>
-                            <span className="text-foreground-subtle">Filled Amount:</span>
-                            <span className="ml-2 text-foreground font-medium">{order.filledAmount.toFixed(2)}</span>
+                            <span className="text-foreground-subtle">Size:</span>
+                            <span className="ml-2 text-foreground font-medium">${order.filledAmount.toFixed(2)}</span>
                           </div>
                           <div>
                             <span className="text-foreground-subtle">Leverage:</span>
@@ -235,34 +325,42 @@ export function TerminalPanel({ agentName }: TerminalPanelProps) {
         )}
 
         {/* Model Chat Tab */}
-        {activeTab === 'chat' && (
+        {activeTab === 'chat' && !isLoading && (
           <div className="divide-y divide-border">
-            {messages.map((message) => (
-              <div key={message.id} className="p-4 hover:bg-background-secondary/50 transition-colors">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                    <AgentIcon className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-primary">{agentName.toUpperCase()}</span>
-                      <span className="text-xs text-foreground-subtle">{formatTime(message.timestamp)}</span>
-                    </div>
-                    <p className={`text-sm text-foreground leading-relaxed ${!message.isExpanded ? 'line-clamp-3' : ''}`}>
-                      {message.content}
-                    </p>
-                    {message.content.length > 150 && (
-                      <button
-                        onClick={() => toggleMessageExpand(message.id)}
-                        className="text-xs text-foreground-muted hover:text-foreground mt-1"
-                      >
-                        {message.isExpanded ? 'Show less' : 'Click to expand'}
-                      </button>
-                    )}
-                  </div>
+            {messages.length === 0 ? (
+              <div className="p-4">
+                <div className="text-center text-foreground-muted text-sm py-8">
+                  No model chat history yet
                 </div>
               </div>
-            ))}
+            ) : (
+              messages.map((message) => (
+                <div key={message.id} className="p-4 hover:bg-background-secondary/50 transition-colors">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <AgentIcon className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-primary">{agentName.toUpperCase()}</span>
+                        <span className="text-xs text-foreground-subtle">{formatTime(message.timestamp)}</span>
+                      </div>
+                      <p className={`text-sm text-foreground leading-relaxed ${!message.isExpanded ? 'line-clamp-3' : ''}`}>
+                        {message.content}
+                      </p>
+                      {message.content.length > 150 && (
+                        <button
+                          onClick={() => toggleMessageExpand(message.id)}
+                          className="text-xs text-foreground-muted hover:text-foreground mt-1"
+                        >
+                          {message.isExpanded ? 'Show less' : 'Click to expand'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
 
             {/* Optimize Prompt Button */}
             <div className="p-4 flex justify-center">
@@ -274,7 +372,7 @@ export function TerminalPanel({ agentName }: TerminalPanelProps) {
         )}
 
         {/* Positions Tab */}
-        {activeTab === 'positions' && (
+        {activeTab === 'positions' && !isLoading && (
           <div className="p-4">
             {positions.length === 0 ? (
               <div className="text-center text-foreground-muted text-sm py-8">

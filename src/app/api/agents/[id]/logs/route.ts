@@ -86,7 +86,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const logs = await query;
 
-    return NextResponse.json({ logs });
+    // Transform logs to expected format
+    const formattedLogs = logs.map(log => ({
+      id: log.id,
+      logType: log.logType,
+      symbol: log.symbol,
+      content: log.content,
+      decision: log.decision,
+      timestamp: log.createdAt,
+    }));
+
+    return NextResponse.json({ logs: formattedLogs });
   } catch (error) {
     console.error('Get logs error:', error);
     return NextResponse.json(

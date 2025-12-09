@@ -13,6 +13,12 @@ import { eq, and } from 'drizzle-orm';
 import { decryptPrivateKey } from '@/lib/crypto';
 import { createServerTrader, hyperliquid } from '@/lib/hyperliquid';
 import {
+  getDemoAccountState,
+  simulatePlaceOrder,
+  simulateClosePosition,
+  checkDemoStopLossTakeProfit,
+} from './demo-simulator';
+import {
   callLLM,
   selectModelForTask,
   AgentLLMConfig,
@@ -36,6 +42,8 @@ interface AgentConfig {
   id: string;
   userId: string;
   name: string;
+  isDemo: boolean;
+  demoBalance: number;
   personality: string;
   strategy: string;
   policies: {
@@ -103,6 +111,8 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
       id: agent.id,
       userId: agent.userId,
       name: agent.name,
+      isDemo: agent.isDemo,
+      demoBalance: parseFloat(agent.demoBalance || '5000'),
       personality: agent.personality,
       strategy: agent.strategy,
       policies: agent.policies as AgentConfig['policies'],
@@ -111,21 +121,53 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
       apiKeyEncrypted: agent.apiKeyEncrypted,
     };
 
-    await logAgentThinking(agentId, `Starting analysis cycle...`);
+    const modeLabel = config.isDemo ? '[DEMO]' : '[LIVE]';
+    await logAgentThinking(agentId, `${modeLabel} Starting analysis cycle...`);
 
-    // 2. Create trader instance
-    const privateKey = decryptPrivateKey(config.apiKeyEncrypted) as Hex;
-    const trader = createServerTrader(privateKey, process.env.HYPERLIQUID_NETWORK === 'testnet');
+    // 2. Get account state (different for demo vs live)
+    let accountState: {
+      accountValue: number;
+      freeCollateral: number;
+      positions: Array<{
+        coin: string;
+        side: 'long' | 'short';
+        size: number;
+        entryPrice: number;
+        markPrice: number;
+        unrealizedPnl: number;
+        leverage: number;
+      }>;
+    };
 
-    // 3. Get account state
-    const accountState = await trader.getAccountState();
-    if (!accountState) {
-      await logAgentError(agentId, 'Failed to fetch account state');
-      return [];
+    if (config.isDemo) {
+      // Demo mode: use simulated account state
+      const demoState = await getDemoAccountState(agentId);
+      if (!demoState) {
+        await logAgentError(agentId, 'Failed to fetch demo account state');
+        return [];
+      }
+      accountState = {
+        accountValue: demoState.accountValue,
+        freeCollateral: demoState.freeCollateral,
+        positions: demoState.positions,
+      };
+
+      // Check stop-loss and take-profit for demo positions
+      await checkDemoStopLossTakeProfit(agentId);
+    } else {
+      // Live mode: use real Hyperliquid API
+      const privateKey = decryptPrivateKey(config.apiKeyEncrypted) as Hex;
+      const trader = createServerTrader(privateKey, process.env.HYPERLIQUID_NETWORK === 'testnet');
+      const realState = await trader.getAccountState();
+      if (!realState) {
+        await logAgentError(agentId, 'Failed to fetch account state');
+        return [];
+      }
+      accountState = realState;
     }
 
     await logAgentThinking(agentId,
-      `Account: $${accountState.accountValue.toFixed(2)} | ` +
+      `${modeLabel} Account: $${accountState.accountValue.toFixed(2)} | ` +
       `Free: $${accountState.freeCollateral.toFixed(2)} | ` +
       `Positions: ${accountState.positions.length}`
     );
@@ -184,7 +226,18 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
 
       // 8. Execute if confidence is high enough
       if (decision.action !== 'hold' && decision.confidence >= 70) {
-        const result = await executeDecision(trader, config, decision, accountState);
+        let result: { success: boolean; orderId?: string; error?: string };
+
+        if (config.isDemo) {
+          // Demo mode: use simulator
+          result = await executeDemoDecision(agentId, config, decision, market);
+        } else {
+          // Live mode: use real trader
+          const privateKey = decryptPrivateKey(config.apiKeyEncrypted) as Hex;
+          const trader = createServerTrader(privateKey, process.env.HYPERLIQUID_NETWORK === 'testnet');
+          result = await executeDecision(trader, config, decision, accountState);
+        }
+
         results.push({
           success: result.success,
           decision,
@@ -570,7 +623,54 @@ async function trackLLMUsage(
 }
 
 /**
- * Execute a trading decision
+ * Execute a demo trading decision using simulator
+ */
+async function executeDemoDecision(
+  agentId: string,
+  config: AgentConfig,
+  decision: TradingDecision,
+  market: MarketData
+): Promise<{ success: boolean; orderId?: string; error?: string }> {
+  try {
+    if (decision.action === 'close') {
+      const result = await simulateClosePosition(agentId, decision.coin, decision.reasoning);
+      return {
+        success: result.success,
+        orderId: result.orderId,
+        error: result.error,
+      };
+    }
+
+    if (decision.action === 'buy' || decision.action === 'sell') {
+      const result = await simulatePlaceOrder(agentId, {
+        coin: decision.coin,
+        side: decision.action,
+        size: decision.size || (config.policies.maxPositionSizeUsd / market.price / 2),
+        orderType: 'market',
+        leverage: decision.leverage || Math.min(config.policies.maxLeverage, 3),
+        takeProfit: decision.takeProfit,
+        stopLoss: decision.stopLoss,
+        reasoning: decision.reasoning,
+      });
+
+      return {
+        success: result.success,
+        orderId: result.orderId,
+        error: result.error,
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Execute a trading decision (live mode)
  */
 async function executeDecision(
   trader: ReturnType<typeof createServerTrader>,
