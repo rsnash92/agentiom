@@ -124,10 +124,11 @@ function CreateAgentModal() {
       return;
     }
 
-    if (!inviteCodeValid) {
-      setError('Please enter a valid invite code');
-      return;
-    }
+    // Skip invite validation during development
+    // if (!inviteCodeValid) {
+    //   setError('Please enter a valid invite code');
+    //   return;
+    // }
 
     setIsSubmitting(true);
     setError(null);
@@ -235,7 +236,7 @@ function CreateAgentModal() {
             {hasInviteCode ? (
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <label className="text-sm text-foreground-muted">Invitation Code*</label>
+                  <label className="text-sm text-foreground-muted">Invitation Code (optional during development)</label>
                   <HelpIcon className="w-4 h-4 text-foreground-subtle" />
                 </div>
                 <div className="relative">
@@ -264,9 +265,9 @@ function CreateAgentModal() {
                 )}
               </div>
             ) : (
-              <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
-                <p className="text-sm text-warning">
-                  An invitation code is required to create an agent. Join our Discord to request one.
+              <div className="p-4 bg-foreground-subtle/10 border border-foreground-subtle/20 rounded-lg">
+                <p className="text-sm text-foreground-muted">
+                  Invite codes are disabled during development. You can create agents without one.
                 </p>
               </div>
             )}
@@ -424,7 +425,7 @@ function CreateAgentModal() {
           <div className="px-6 py-4 border-t border-border">
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting || !inviteCodeValid}
+              disabled={isSubmitting}
               className="w-full py-3.5 bg-primary text-black font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all tracking-wide"
             >
               {isSubmitting ? 'CREATING...' : 'CREATE AGENT'}
