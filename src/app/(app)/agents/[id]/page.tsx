@@ -3,11 +3,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { TVChart, TIMEFRAMES, PositionsTable, AgentSidebar, AgentRightPanel, AgentSwitcherBar, CreatePositionPanel, ChatPanel, AgentConfigPanel, PortfolioPanel, ToolsPanel, LogsPanel, NotificationsPanel, ApiKeysPanel, MarketSelector } from '@/components/trading';
+import { TVChart, TIMEFRAMES, AgentSwitcherBar, MarketSelector, TerminalPanel, SimpleAgentSettings } from '@/components/trading';
 import { useMarketData, useAgent, useAgents } from '@/lib/hooks';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { AgentSetupChecklist, AgentSettingsPanel, AgentControlsPanel } from '@/components/agent';
-import { ResizablePanel } from '@/components/ui/ResizablePanel';
+import { AgentSetupChecklist } from '@/components/agent';
 
 // Format large numbers
 function formatVolume(value: number): string {
@@ -45,9 +44,8 @@ function AgentTradingPageContent() {
   const { agents: allAgents } = useAgents();
 
   // Fetch the current agent's data
-  const { agent, isLoading: agentLoading, error: agentError, toggleStatus, executeOnce, fetchStatus } = useAgent(agentId);
+  const { agent, isLoading: agentLoading, error: agentError, toggleStatus } = useAgent(agentId);
 
-  const [activeTab, setActiveTab] = useState('tasks');
   const [selectedAgentId, setSelectedAgentId] = useState<string>(agentId || '');
   const [selectedCoin, setSelectedCoin] = useState('BTC');
   const [showCoinDropdown, setShowCoinDropdown] = useState(false);
@@ -130,27 +128,6 @@ function AgentTradingPageContent() {
     status: a.status as 'active' | 'paused',
   }));
 
-  // Generate tasks from agent strategy (placeholder until we have actual tasks)
-  const agentTasks = agent ? [
-    {
-      id: '1',
-      name: `Execute ${agent.strategy.split(' ')[0]} Strategy`,
-      description: agent.strategy,
-      status: agent.status === 'active' ? 'active' as const : 'paused' as const,
-      priority: 1,
-      steps: [
-        'Monitor market conditions',
-        'Validate entry signals',
-        'Execute trade with risk parameters',
-        'Manage position and stop loss',
-      ],
-      totalRuns: 0,
-      successRate: 0,
-      avgCredits: 0,
-      updatedAt: new Date(agent.updatedAt).toLocaleString(),
-    },
-  ] : [];
-
   // Loading state
   if (agentLoading) {
     return (
@@ -221,7 +198,7 @@ function AgentTradingPageContent() {
         />
       )}
 
-      {/* Left Section - Agent Switcher + Chart + Positions */}
+      {/* Left Section - Chart + Terminal */}
       <div className="flex-1 flex flex-col panel-gap min-w-0">
         {/* Top Agent Switcher Bar */}
         <AgentSwitcherBar
@@ -303,90 +280,20 @@ function AgentTradingPageContent() {
           />
         </div>
 
-        {/* Positions Table Panel - hide in fullscreen */}
+        {/* Terminal Panel - 3 Tabs: Order History, Model Chat, Positions */}
         {!isFullscreen && (
           <div className="panel h-[280px] overflow-hidden">
-            <PositionsTable
-              positions={[]}
-              orders={[]}
-              trades={[]}
+            <TerminalPanel
+              agentId={agent.id}
+              agentName={agent.name}
             />
           </div>
         )}
       </div>
 
-      {/* Right Column - Dynamic Content Panel + Sidebar (full height) */}
-      <div className="flex panel-gap">
-        {/* Dynamic Panel Content based on activeTab - Resizable */}
-        <ResizablePanel
-          defaultWidth={490}
-          minWidth={490}
-          maxWidth={800}
-          resizeFrom="left"
-          className="panel flex flex-col overflow-hidden"
-        >
-          {activeTab === 'create' && (
-            <CreatePositionPanel
-              currentPrice={currentPrice}
-              symbol={`${selectedCoin}/USD`}
-              balance={0}
-            />
-          )}
-          {activeTab === 'controls' && (
-            <AgentControlsPanel
-              agentId={agent.id}
-              agentName={agent.name}
-              status={agent.status as 'active' | 'paused'}
-              onToggleStatus={toggleStatus}
-              onExecuteOnce={executeOnce}
-              fetchStatus={fetchStatus}
-            />
-          )}
-          {activeTab === 'tasks' && (
-            <AgentRightPanel
-              agentName={agent.name}
-              agentStatus={agent.status as 'active' | 'paused'}
-              tasks={agentTasks}
-              totalTasks={agentTasks.length}
-              activeTasks={agent.status === 'active' ? agentTasks.length : 0}
-            />
-          )}
-          {activeTab === 'chat' && (
-            <ChatPanel
-              agentName={agent.name}
-              agentId={agent.id}
-              agentStatus={agent.status as 'active' | 'paused'}
-            />
-          )}
-          {activeTab === 'agent' && <AgentConfigPanel />}
-          {activeTab === 'portfolio' && (
-            <PortfolioPanel
-              agentName={agent.name}
-              currentPrice={currentPrice}
-            />
-          )}
-          {activeTab === 'tools' && <ToolsPanel />}
-          {activeTab === 'logs' && <LogsPanel />}
-          {activeTab === 'alerts' && <NotificationsPanel />}
-          {activeTab === 'settings' && (
-            <AgentSettingsPanel
-              agentId={agent.id}
-              initialPersonality={agent.personality}
-              initialStrategy={agent.strategy}
-              initialLlmConfig={agent.llmConfig}
-            />
-          )}
-          {activeTab === 'api' && <ApiKeysPanel />}
-        </ResizablePanel>
-
-        {/* Right Sidebar - Navigation Icons */}
-        <div className="panel">
-          <AgentSidebar
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            agentId={agentId || ''}
-          />
-        </div>
+      {/* Right Panel - Simple Agent Settings */}
+      <div className="w-[320px] panel flex flex-col overflow-hidden">
+        <SimpleAgentSettings agentId={agent.id} />
       </div>
     </div>
   );

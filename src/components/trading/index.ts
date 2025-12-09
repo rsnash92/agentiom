@@ -18,3 +18,5 @@ export { NotificationsPanel } from './NotificationsPanel';
 export { SettingsPanel } from './SettingsPanel';
 export { ApiKeysPanel } from './ApiKeysPanel';
 export { MarketSelector } from './MarketSelector';
+export { TerminalPanel } from './TerminalPanel';
+export { SimpleAgentSettings } from './SimpleAgentSettings';
