@@ -101,7 +101,7 @@ function AgentTradingPageContent() {
   const agentBalance = parseFloat(agent.demoBalance || '5000');
 
   return (
-    <div className="h-[calc(100vh-56px)] flex flex-col bg-background overflow-hidden p-1 panel-gap">
+    <div className="h-[calc(100vh-56px)] flex bg-background overflow-hidden p-1 panel-gap">
       {/* Agent Setup Checklist Modal */}
       {showSetupChecklist && agent && (
         <AgentSetupChecklist
@@ -114,47 +114,44 @@ function AgentTradingPageContent() {
         />
       )}
 
-      {/* Full-width Agent Info Bar */}
-      <AgentInfoCard
-        agentId={agent.id}
-        agentName={agent.name}
-        balance={agentBalance}
-        status={agent.status as 'active' | 'paused'}
-        isDemo={agent.isDemo}
-        onToggleStatus={toggleStatus}
-      />
+      {/* Left Section - Agent Info + Chart + Terminal */}
+      <div className="flex-1 flex flex-col panel-gap min-w-0">
+        {/* Agent Info Bar */}
+        <AgentInfoCard
+          agentId={agent.id}
+          agentName={agent.name}
+          balance={agentBalance}
+          status={agent.status as 'active' | 'paused'}
+          isDemo={agent.isDemo}
+          onToggleStatus={toggleStatus}
+        />
 
-      {/* Main content area */}
-      <div className="flex-1 flex panel-gap min-h-0">
-        {/* Left Section - Chart + Terminal */}
-        <div className="flex-1 flex flex-col panel-gap min-w-0">
-          {/* Performance Chart Panel */}
-          <div
-            ref={chartContainerRef}
-            className={`panel flex-1 min-h-[300px] ${isFullscreen ? 'fixed inset-0 z-50 bg-background p-4 rounded-none' : ''}`}
-          >
-            <AgentPerformanceChart
+        {/* Performance Chart Panel */}
+        <div
+          ref={chartContainerRef}
+          className={`panel flex-1 min-h-[300px] ${isFullscreen ? 'fixed inset-0 z-50 bg-background p-4 rounded-none' : ''}`}
+        >
+          <AgentPerformanceChart
+            agentId={agent.id}
+            initialBalance={5000}
+            currentBalance={agentBalance}
+          />
+        </div>
+
+        {/* Terminal Panel - 3 Tabs: Order History, Model Chat, Positions */}
+        {!isFullscreen && (
+          <div className="panel h-[280px] overflow-hidden">
+            <TerminalPanel
               agentId={agent.id}
-              initialBalance={5000}
-              currentBalance={agentBalance}
+              agentName={agent.name}
             />
           </div>
+        )}
+      </div>
 
-          {/* Terminal Panel - 3 Tabs: Order History, Model Chat, Positions */}
-          {!isFullscreen && (
-            <div className="panel h-[280px] overflow-hidden">
-              <TerminalPanel
-                agentId={agent.id}
-                agentName={agent.name}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Right Panel - Simple Agent Settings */}
-        <div className="w-[320px] panel flex flex-col overflow-hidden">
-          <SimpleAgentSettings agentId={agent.id} />
-        </div>
+      {/* Right Panel - Simple Agent Settings (full height) */}
+      <div className="w-[320px] panel flex flex-col overflow-hidden">
+        <SimpleAgentSettings agentId={agent.id} />
       </div>
     </div>
   );

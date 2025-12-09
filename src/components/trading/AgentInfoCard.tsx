@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePrivy } from '@privy-io/react-auth';
 
@@ -23,29 +23,45 @@ export function AgentInfoCard({
 }: AgentInfoCardProps) {
   const { getAccessToken } = usePrivy();
   const [currentBalance, setCurrentBalance] = useState(initialBalance);
+  const agentIdRef = useRef(agentId);
+
+  // Update ref when agentId changes
+  useEffect(() => {
+    agentIdRef.current = agentId;
+  }, [agentId]);
 
   // Fetch real-time balance from performance API
-  const fetchBalance = useCallback(async () => {
-    try {
-      const token = await getAccessToken();
-      const response = await fetch(`/api/agents/${agentId}/performance`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentBalance(data.currentBalance || initialBalance);
-      }
-    } catch (error) {
-      console.error('Failed to fetch balance:', error);
-    }
-  }, [agentId, getAccessToken, initialBalance]);
-
-  // Fetch on mount and every 10 seconds
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchBalance = async () => {
+      try {
+        const token = await getAccessToken();
+        const response = await fetch(`/api/agents/${agentIdRef.current}/performance`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (response.ok && isMounted) {
+          const data = await response.json();
+          if (data.currentBalance !== undefined) {
+            setCurrentBalance(data.currentBalance);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch balance:', error);
+      }
+    };
+
+    // Fetch immediately
     fetchBalance();
-    const interval = setInterval(fetchBalance, 10000);
-    return () => clearInterval(interval);
-  }, [fetchBalance]);
+
+    // Then every 5 seconds
+    const interval = setInterval(fetchBalance, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [agentId, getAccessToken]);
 
   return (
     <div className="panel px-4 py-2 flex items-center gap-4">
