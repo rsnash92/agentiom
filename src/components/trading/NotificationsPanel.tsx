@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FormInput } from '@/components/ui/trading-form';
 
 interface Notification {
   id: string;
@@ -22,10 +23,8 @@ export function NotificationsPanel({
   notifications = [],
   onRefresh,
   onClearRead,
-  onDeselectAll,
 }: NotificationsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
 
   const totalCount = notifications.length;
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -37,67 +36,39 @@ export function NotificationsPanel({
   );
 
   return (
-    <div className="flex flex-col h-full bg-background-secondary">
+    <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-              <BellIcon className="w-5 h-5 text-primary" />
+      <div className="px-4 py-3 border-b border-border/40 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <BellIcon className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold">Notifications</h3>
-              <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+              <h3 className="text-xs font-medium">Notifications</h3>
+              <div className="text-[10px] text-foreground-muted">
                 {totalCount} total, {unreadCount} unread
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onRefresh}
-              className="p-2 rounded-lg hover:bg-card text-foreground-muted hover:text-foreground transition-colors"
-              title="Refresh"
-            >
-              <RefreshIcon className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`p-2 rounded-lg transition-colors ${
-                showFilters
-                  ? 'bg-primary text-black'
-                  : 'hover:bg-card text-foreground-muted hover:text-foreground'
-              }`}
-              title="Filter"
-            >
-              <FilterIcon className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="relative mb-3">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-subtle" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search notifications..."
-            className="w-full pl-9 pr-3 py-2.5 bg-card border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
-          />
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center justify-between">
           <button
-            onClick={onDeselectAll}
-            className="text-xs text-foreground-muted hover:text-foreground transition-colors"
+            onClick={onRefresh}
+            className="p-1.5 rounded hover:bg-background-secondary text-foreground-muted hover:text-foreground transition-colors"
           >
-            Deselect All
+            <RefreshIcon className="w-4 h-4" />
           </button>
+        </div>
+
+        <FormInput
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search notifications..."
+        />
+
+        <div className="flex items-center justify-end">
           <button
             onClick={onClearRead}
-            className="text-xs text-foreground-muted hover:text-foreground transition-colors"
+            className="text-[10px] text-foreground-muted hover:text-foreground transition-colors"
           >
             Clear Read
           </button>
@@ -107,13 +78,13 @@ export function NotificationsPanel({
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {filteredNotifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full py-12 text-foreground-muted">
-            <BellOffIcon className="w-16 h-16 mb-4 opacity-30" />
-            <h4 className="text-lg font-semibold text-foreground mb-1">No Notifications</h4>
-            <p className="text-sm text-foreground-subtle">No notifications yet</p>
+          <div className="flex flex-col items-center justify-center h-full py-8 text-foreground-muted">
+            <BellOffIcon className="w-12 h-12 mb-3 opacity-30" />
+            <h4 className="text-sm font-medium text-foreground mb-1">No Notifications</h4>
+            <p className="text-[10px] text-foreground-subtle">No notifications yet</p>
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-border/40">
             {filteredNotifications.map((notification) => (
               <NotificationCard key={notification.id} notification={notification} />
             ))}
@@ -137,27 +108,23 @@ function NotificationCard({ notification }: NotificationCardProps) {
   };
 
   return (
-    <div
-      className={`p-4 hover:bg-card/50 transition-colors ${
-        !notification.read ? 'bg-primary/5' : ''
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${typeStyles[notification.type]}`}>
-          {notification.type === 'info' && <InfoIcon className="w-4 h-4" />}
-          {notification.type === 'success' && <CheckIcon className="w-4 h-4" />}
-          {notification.type === 'warning' && <WarningIcon className="w-4 h-4" />}
-          {notification.type === 'error' && <ErrorIcon className="w-4 h-4" />}
+    <div className={`p-3 hover:bg-background-secondary/50 transition-colors ${!notification.read ? 'bg-primary/5' : ''}`}>
+      <div className="flex items-start gap-2">
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${typeStyles[notification.type]}`}>
+          {notification.type === 'info' && <InfoIcon className="w-3 h-3" />}
+          {notification.type === 'success' && <CheckIcon className="w-3 h-3" />}
+          {notification.type === 'warning' && <WarningIcon className="w-3 h-3" />}
+          {notification.type === 'error' && <ErrorIcon className="w-3 h-3" />}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1">
-            <h4 className="text-sm font-medium">{notification.title}</h4>
+          <div className="flex items-center justify-between mb-0.5">
+            <h4 className="text-xs font-medium">{notification.title}</h4>
             {!notification.read && (
-              <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
             )}
           </div>
-          <p className="text-xs text-foreground-muted mb-2">{notification.message}</p>
-          <span className="text-[11px] text-foreground-subtle">{notification.timestamp}</span>
+          <p className="text-[10px] text-foreground-muted mb-1">{notification.message}</p>
+          <span className="text-[10px] text-foreground-subtle">{notification.timestamp}</span>
         </div>
       </div>
     </div>
@@ -186,28 +153,11 @@ function BellOffIcon({ className }: { className?: string }) {
   );
 }
 
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.35-4.35" />
-    </svg>
-  );
-}
-
 function RefreshIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M23 4v6h-6M1 20v-6h6" />
       <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-    </svg>
-  );
-}
-
-function FilterIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
     </svg>
   );
 }

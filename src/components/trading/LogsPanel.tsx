@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { TabGroup, FormInput } from '@/components/ui/trading-form';
 
 interface Analysis {
   id: string;
@@ -20,7 +21,7 @@ const sampleAnalyses: Analysis[] = [
     id: '1',
     type: 'platform',
     title: 'BTC Analysis',
-    description: 'comprehensive analysis for BTC on platform. Market showing neutral conditions with medium risk level.',
+    description: 'Comprehensive analysis for BTC. Market showing neutral conditions with medium risk level.',
     author: 'BigTonyXBT',
     date: '05/12/2025',
     timeAgo: '1d ago',
@@ -32,7 +33,7 @@ const sampleAnalyses: Analysis[] = [
     id: '2',
     type: 'platform',
     title: 'BTC Analysis',
-    description: 'comprehensive analysis for BTC on platform. Market showing neutral conditions with medium risk level.',
+    description: 'Comprehensive analysis for BTC. Market showing neutral conditions with medium risk level.',
     author: 'BigTonyXBT',
     date: '03/12/2025',
     timeAgo: '3d ago',
@@ -40,42 +41,15 @@ const sampleAnalyses: Analysis[] = [
     isPremium: true,
     securedWith: 'X402',
   },
-  {
-    id: '3',
-    type: 'platform',
-    title: 'BTC Analysis',
-    description: 'comprehensive analysis for BTC on platform. Market showing neutral conditions with medium risk level.',
-    author: 'BigTonyXBT',
-    date: '02/12/2025',
-    timeAgo: '4d ago',
-    price: 0.10,
-    isPremium: true,
-    securedWith: 'X402',
-  },
-  {
-    id: '4',
-    type: 'platform',
-    title: 'BTC Analysis',
-    description: 'comprehensive analysis for BTC on platform. Market showing neutral conditions with medium risk level.',
-    author: 'BigTonyXBT',
-    date: '01/12/2025',
-    timeAgo: '5d ago',
-    price: 0.10,
-    isPremium: true,
-    securedWith: 'X402',
-  },
 ];
-
-type TabType = 'news' | 'analysis';
 
 interface LogsPanelProps {
   onBuyAnalysis?: (analysisId: string) => void;
 }
 
 export function LogsPanel({ onBuyAnalysis }: LogsPanelProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('analysis');
+  const [activeTab, setActiveTab] = useState<'news' | 'analysis'>('analysis');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
 
   const filteredAnalyses = sampleAnalyses.filter(
     (analysis) =>
@@ -85,86 +59,38 @@ export function LogsPanel({ onBuyAnalysis }: LogsPanelProps) {
   );
 
   return (
-    <div className="flex flex-col h-full bg-background-secondary">
+    <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
-            <ChartBarIcon className="w-5 h-5 text-orange-400" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold">Central Intelligence Feed</h3>
-            <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
-              <span className="w-1.5 h-1.5 rounded-full bg-success" />
-              1664 analyses
-            </div>
-          </div>
-        </div>
+      <div className="px-4 py-3 border-b border-border/40 space-y-3">
+        <TabGroup
+          tabs={[
+            { value: 'news', label: 'News' },
+            { value: 'analysis', label: 'Analysis' },
+          ]}
+          value={activeTab}
+          onChange={(v) => setActiveTab(v as 'news' | 'analysis')}
+        />
 
-        {/* Tabs */}
-        <div className="flex bg-background rounded-lg p-1 mb-3">
-          <button
-            onClick={() => setActiveTab('news')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'news'
-                ? 'bg-card text-foreground'
-                : 'text-foreground-muted hover:text-foreground'
-            }`}
-          >
-            <NewsIcon className="w-4 h-4" />
-            News
-          </button>
-          <button
-            onClick={() => setActiveTab('analysis')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'analysis'
-                ? 'bg-primary text-black'
-                : 'text-foreground-muted hover:text-foreground'
-            }`}
-          >
-            <AnalysisIcon className="w-4 h-4" />
-            Analysis
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-subtle" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search analysis..."
-              className="w-full pl-9 pr-3 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
-            />
-          </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`p-2 rounded-lg border transition-colors ${
-              showFilters
-                ? 'bg-primary text-black border-primary'
-                : 'bg-card border-border hover:border-border-hover text-foreground-muted hover:text-foreground'
-            }`}
-          >
-            <FilterIcon className="w-4 h-4" />
-          </button>
-        </div>
+        <FormInput
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search analysis..."
+        />
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {activeTab === 'news' ? (
-          <div className="flex flex-col items-center justify-center h-full py-12 text-foreground-muted">
-            <NewsIcon className="w-12 h-12 mb-3 opacity-30" />
-            <p className="text-sm">No news available</p>
-            <p className="text-xs text-foreground-subtle mt-1">Check back later for updates</p>
+          <div className="flex flex-col items-center justify-center h-full py-8 text-foreground-muted">
+            <NewsIcon className="w-10 h-10 mb-3 opacity-30" />
+            <p className="text-xs">No news available</p>
+            <p className="text-[10px] text-foreground-subtle mt-1">Check back later</p>
           </div>
         ) : filteredAnalyses.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full py-12 text-foreground-muted">
-            <AnalysisIcon className="w-12 h-12 mb-3 opacity-30" />
-            <p className="text-sm">No analysis found</p>
-            <p className="text-xs text-foreground-subtle mt-1">Try adjusting your search</p>
+          <div className="flex flex-col items-center justify-center h-full py-8 text-foreground-muted">
+            <AnalysisIcon className="w-10 h-10 mb-3 opacity-30" />
+            <p className="text-xs">No analysis found</p>
+            <p className="text-[10px] text-foreground-subtle mt-1">Try adjusting your search</p>
           </div>
         ) : (
           filteredAnalyses.map((analysis) => (
@@ -187,63 +113,55 @@ interface AnalysisCardProps {
 
 function AnalysisCard({ analysis, onBuy }: AnalysisCardProps) {
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
-      {/* Header */}
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2 px-2.5 py-1 bg-background rounded-md">
-            <TrendIcon className="w-3.5 h-3.5 text-foreground-muted" />
-            <span className="text-xs text-foreground-muted capitalize">{analysis.type}</span>
+    <div className="border border-border/60 rounded-lg overflow-hidden">
+      <div className="p-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-background-secondary rounded text-[10px] text-foreground-muted">
+            <TrendIcon className="w-3 h-3" />
+            <span className="capitalize">{analysis.type}</span>
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-500/20 rounded-md">
-            <LockIcon className="w-3 h-3 text-orange-400" />
-            <span className="text-xs font-semibold text-orange-400">${analysis.price.toFixed(2)}</span>
+          <div className="flex items-center gap-1 px-2 py-0.5 bg-warning/10 rounded text-[10px] font-medium text-warning">
+            <LockIcon className="w-2.5 h-2.5" />
+            ${analysis.price.toFixed(2)}
           </div>
         </div>
 
-        {/* Title & Description */}
-        <h4 className="text-base font-semibold text-center mb-2">{analysis.title}</h4>
-        <p className="text-xs text-foreground-muted text-center mb-4">{analysis.description}</p>
+        <h4 className="text-xs font-medium text-center mb-1">{analysis.title}</h4>
+        <p className="text-[10px] text-foreground-muted text-center mb-3">{analysis.description}</p>
 
-        {/* Meta */}
-        <div className="flex items-center justify-between pt-3 border-t border-border">
-          <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center justify-between pt-2 border-t border-border/40">
+          <div className="flex items-center gap-1.5 text-[10px]">
             <span className="text-foreground">{analysis.author}</span>
             <span className="text-foreground-subtle">·</span>
-            <ClockIcon className="w-3 h-3 text-foreground-subtle" />
             <span className="text-foreground-subtle">{analysis.date}</span>
             <span className="text-primary">{analysis.timeAgo}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-black text-xs font-semibold rounded-md hover:bg-primary/90 transition-colors">
-              <MinusIcon className="w-3 h-3" />
+          <div className="flex items-center gap-1.5">
+            <button className="px-2 py-1 bg-primary text-black text-[10px] font-medium rounded hover:bg-primary/90 transition-colors">
               HOLD
             </button>
             <button
               onClick={onBuy}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground-subtle/20 text-foreground text-xs font-medium rounded-md hover:bg-foreground-subtle/30 transition-colors"
+              className="px-2 py-1 bg-background-secondary text-[10px] font-medium rounded hover:bg-card transition-colors"
             >
-              <CopyIcon className="w-3 h-3" />
               Buy
             </button>
           </div>
         </div>
       </div>
 
-      {/* Premium Footer */}
       {analysis.isPremium && (
-        <div className="px-4 py-2.5 bg-background border-t border-border flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs">
-            <LockIcon className="w-3 h-3 text-foreground-subtle" />
-            <span className="text-foreground-muted">Premium Content</span>
+        <div className="px-3 py-2 bg-background-secondary border-t border-border/40 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-[10px]">
+            <LockIcon className="w-2.5 h-2.5 text-foreground-subtle" />
+            <span className="text-foreground-muted">Premium</span>
             <span className="text-foreground-subtle">·</span>
-            <span className="text-primary">One-time payment of ${analysis.price.toFixed(2)} USDC</span>
+            <span className="text-primary">${analysis.price.toFixed(2)} USDC</span>
           </div>
           {analysis.securedWith && (
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-card border border-border rounded-full">
-              <span className="w-2 h-2 rounded-full bg-success" />
-              <span className="text-[10px] text-foreground-muted">Secured with {analysis.securedWith}</span>
-              <InfoIcon className="w-3 h-3 text-foreground-subtle" />
+            <div className="flex items-center gap-1 px-1.5 py-0.5 bg-background border border-border/60 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-success" />
+              <span className="text-[9px] text-foreground-muted">{analysis.securedWith}</span>
             </div>
           )}
         </div>
@@ -253,17 +171,6 @@ function AnalysisCard({ analysis, onBuy }: AnalysisCardProps) {
 }
 
 // Icons
-function ChartBarIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 3v18h18" />
-      <path d="M18 17V9" />
-      <path d="M13 17V5" />
-      <path d="M8 17v-3" />
-    </svg>
-  );
-}
-
 function NewsIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -282,23 +189,6 @@ function AnalysisIcon({ className }: { className?: string }) {
   );
 }
 
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.35-4.35" />
-    </svg>
-  );
-}
-
-function FilterIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-    </svg>
-  );
-}
-
 function TrendIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -313,41 +203,6 @@ function LockIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0110 0v4" />
-    </svg>
-  );
-}
-
-function ClockIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 6v6l4 2" />
-    </svg>
-  );
-}
-
-function MinusIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M5 12h14" />
-    </svg>
-  );
-}
-
-function CopyIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-    </svg>
-  );
-}
-
-function InfoIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 16v-4M12 8h.01" />
     </svg>
   );
 }
