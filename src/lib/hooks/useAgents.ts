@@ -99,11 +99,15 @@ export function useAgents() {
         },
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to fetch agents');
+        const errorMsg = data.details
+          ? `${data.error}: ${data.details}`
+          : data.error || 'Failed to fetch agents';
+        throw new Error(errorMsg);
       }
 
-      const data = await response.json();
       setAgents(data.agents || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch agents');
