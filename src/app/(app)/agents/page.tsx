@@ -129,15 +129,24 @@ function AgentsPageContent() {
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-border">
-                      <div className="flex items-center gap-2 text-xs text-foreground-muted">
-                        <span className="flex items-center gap-1">
-                          <ModelIcon className="h-3 w-3" />
-                          {getLLMDisplayName(agent.llmProvider)}
-                        </span>
-                        <span>•</span>
-                        <span>
-                          {formatPairs(agent.policies.approvedPairs).join(', ')}
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs text-foreground-muted">
+                          <span className="flex items-center gap-1">
+                            <ModelIcon className="h-3 w-3" />
+                            {getLLMDisplayName(agent.llmProvider)}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            {formatPairs(agent.policies.approvedPairs).join(', ')}
+                          </span>
+                        </div>
+                        <Link
+                          href={`/agents/${agent.id}/details`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          DETAILS
+                        </Link>
                       </div>
                     </div>
                   </CardContent>
