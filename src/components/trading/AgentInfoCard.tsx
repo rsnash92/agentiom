@@ -20,60 +20,50 @@ export function AgentInfoCard({
   onToggleStatus,
 }: AgentInfoCardProps) {
   return (
-    <div className="panel p-4">
-      <div className="flex items-start justify-between">
-        {/* Left side - Agent info */}
-        <div className="flex items-center gap-3">
-          {/* Agent avatar/icon */}
-          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-            <AgentIcon className="w-5 h-5 text-primary" />
-          </div>
+    <div className="panel px-4 py-2 flex items-center gap-4">
+      {/* Agent avatar/icon */}
+      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+        <AgentIcon className="w-4 h-4 text-primary" />
+      </div>
 
-          <div>
-            {/* Agent name */}
-            <h2 className="font-semibold text-foreground">{agentName}</h2>
-
-            {/* Balance */}
-            <div className="text-xl font-bold text-foreground mt-0.5">
-              {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </div>
+      {/* Agent name and balance */}
+      <div className="min-w-0">
+        <h2 className="text-sm font-medium text-foreground truncate">{agentName}</h2>
+        <div className="text-base font-bold text-foreground">
+          {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
+      </div>
 
-        {/* Right side - Status and actions */}
-        <div className="flex flex-col items-end gap-2">
-          {/* Status badge row */}
-          <div className="flex items-center gap-2">
-            {/* Running/Paused status */}
-            <button
-              onClick={onToggleStatus}
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                status === 'active'
-                  ? 'bg-success/20 text-success hover:bg-success/30'
-                  : 'bg-foreground-subtle/20 text-foreground-muted hover:bg-foreground-subtle/30'
-              }`}
-            >
-              {status === 'active' ? 'RUNNING' : 'PAUSED'}
-            </button>
+      {/* Status badges */}
+      <div className="flex items-center gap-2 ml-auto">
+        {/* Running/Paused status */}
+        <button
+          onClick={onToggleStatus}
+          className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+            status === 'active'
+              ? 'bg-success/20 text-success hover:bg-success/30'
+              : 'bg-foreground-subtle/20 text-foreground-muted hover:bg-foreground-subtle/30'
+          }`}
+        >
+          {status === 'active' ? 'RUNNING' : 'PAUSED'}
+        </button>
 
-            {/* Demo/Live badge */}
-            <span className={`px-2 py-1 rounded text-xs font-medium ${
-              isDemo
-                ? 'bg-blue-500/20 text-blue-400'
-                : 'bg-primary/20 text-primary'
-            }`}>
-              {isDemo ? 'DEMO TRADING' : 'LIVE TRADING'}
-            </span>
-          </div>
+        {/* Demo/Live badge */}
+        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+          isDemo
+            ? 'bg-blue-500/20 text-blue-400'
+            : 'bg-primary/20 text-primary'
+        }`}>
+          {isDemo ? 'DEMO TRADING' : 'LIVE TRADING'}
+        </span>
 
-          {/* Details link */}
-          <Link
-            href={`/agents/${agentId}/settings`}
-            className="text-xs text-primary hover:text-primary/80 font-medium"
-          >
-            DETAILS
-          </Link>
-        </div>
+        {/* Details link */}
+        <Link
+          href={`/agents/${agentId}/settings`}
+          className="text-[10px] text-primary hover:text-primary/80 font-medium ml-1"
+        >
+          DETAILS
+        </Link>
       </div>
     </div>
   );

@@ -55,10 +55,10 @@ export function AgentPerformanceChart({
     [initialBalance, currentBalance]
   );
 
-  // Calculate chart dimensions and scaling
-  const chartWidth = 900;
-  const chartHeight = 400;
-  const padding = { top: 20, right: 60, bottom: 40, left: 60 };
+  // Calculate chart dimensions and scaling - using larger viewBox for smaller text
+  const chartWidth = 1200;
+  const chartHeight = 500;
+  const padding = { top: 30, right: 80, bottom: 50, left: 80 };
 
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
@@ -115,9 +115,9 @@ export function AgentPerformanceChart({
   void agentId;
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="h-full flex flex-col">
       {/* Chart Controls */}
-      <div className="flex items-center justify-between px-4 py-2">
+      <div className="flex items-center justify-between px-3 py-1.5">
         {/* Display Mode Toggle */}
         <div className="flex items-center gap-1 bg-background-secondary rounded p-0.5">
           <button
@@ -168,7 +168,7 @@ export function AgentPerformanceChart({
       </div>
 
       {/* Chart */}
-      <div className="flex-1 px-2">
+      <div className="flex-1 px-1">
         <svg
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
           className="w-full h-full"
@@ -232,7 +232,8 @@ export function AgentPerformanceChart({
               y={padding.top + (i / (yLabels.length - 1)) * innerHeight}
               textAnchor="end"
               dominantBaseline="middle"
-              className="fill-foreground-muted text-[10px]"
+              className="fill-foreground-muted"
+              fontSize="11"
             >
               ${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </text>
@@ -243,9 +244,10 @@ export function AgentPerformanceChart({
             <text
               key={i}
               x={xScale(label.index)}
-              y={chartHeight - 10}
+              y={chartHeight - 15}
               textAnchor="middle"
-              className="fill-foreground-muted text-[10px]"
+              className="fill-foreground-muted"
+              fontSize="11"
             >
               {label.label}
             </text>
