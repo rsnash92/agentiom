@@ -35,7 +35,7 @@ const EXAMPLE_PROMPTS = `EX:
 function CreateAgentModal() {
   const router = useRouter();
   const { authenticated, login } = usePrivy();
-  const { createAgent } = useAgents();
+  const { createAgent, error: agentError } = useAgents();
 
   // Form state
   const [tradingMode, setTradingMode] = useState<'demo' | 'live'>('demo');
@@ -153,7 +153,8 @@ function CreateAgentModal() {
       if (agent) {
         router.push(`/agents/${agent.id}`);
       } else {
-        setError('Failed to create agent. Please try again.');
+        // Use error from hook if available
+        setError(agentError || 'Failed to create agent. Please try again.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create agent');
