@@ -4,6 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePrivy } from '@privy-io/react-auth';
 
+interface OtherAgent {
+  id: string;
+  name: string;
+  status: string;
+}
+
 interface AgentInfoCardProps {
   agentId: string;
   agentName: string;
@@ -11,6 +17,8 @@ interface AgentInfoCardProps {
   status: 'active' | 'paused';
   isDemo: boolean;
   onToggleStatus?: () => void;
+  otherAgents?: OtherAgent[];
+  onSelectAgent?: (agentId: string) => void;
 }
 
 export function AgentInfoCard({
@@ -20,10 +28,25 @@ export function AgentInfoCard({
   status,
   isDemo,
   onToggleStatus,
+  otherAgents = [],
+  onSelectAgent,
 }: AgentInfoCardProps) {
   const { getAccessToken } = usePrivy();
   const [currentBalance, setCurrentBalance] = useState(initialBalance);
   const [unrealizedPnl, setUnrealizedPnl] = useState(0);
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowAgentDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Reset balance when initialBalance prop changes (e.g. agent switch)
   useEffect(() => {
@@ -73,9 +96,17 @@ export function AgentInfoCard({
         <AgentIcon className="w-4 h-4 text-primary" />
       </div>
 
-      {/* Agent name and balance */}
-      <div className="min-w-0">
-        <h2 className="text-sm font-medium text-foreground truncate">{agentName}</h2>
+      {/* Agent name and balance with dropdown */}
+      <div className="min-w-0 relative" ref={dropdownRef}>
+        <button
+          onClick={() => otherAgents.length > 0 && setShowAgentDropdown(!showAgentDropdown)}
+          className={`flex items-center gap-1 text-sm font-medium text-foreground truncate ${otherAgents.length > 0 ? 'hover:text-primary cursor-pointer' : ''}`}
+        >
+          {agentName}
+          {otherAgents.length > 0 && (
+            <ChevronDownIcon className={`w-3 h-3 transition-transform ${showAgentDropdown ? 'rotate-180' : ''}`} />
+          )}
+        </button>
         <div className="flex items-baseline gap-2">
           <span className="text-base font-bold text-foreground">
             ${currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -86,6 +117,32 @@ export function AgentInfoCard({
             </span>
           )}
         </div>
+
+        {/* Agent Dropdown */}
+        {showAgentDropdown && otherAgents.length > 0 && (
+          <div className="absolute top-full left-0 mt-1 z-50 bg-background-secondary border border-border rounded-lg shadow-lg py-1 min-w-[180px]">
+            {otherAgents.map((agent) => (
+              <button
+                key={agent.id}
+                onClick={() => {
+                  onSelectAgent?.(agent.id);
+                  setShowAgentDropdown(false);
+                }}
+                className={`w-full px-3 py-2 text-left text-sm hover:bg-background-tertiary transition-colors flex items-center gap-2 ${
+                  agent.id === agentId ? 'text-primary font-medium' : 'text-foreground'
+                }`}
+              >
+                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  agent.status === 'active' ? 'bg-success' : 'bg-foreground-subtle'
+                }`} />
+                <span className="truncate">{agent.name}</span>
+                {agent.id === agentId && (
+                  <CheckIcon className="w-3 h-3 ml-auto flex-shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Status badges */}
@@ -154,6 +211,22 @@ function PlusIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M20 6L9 17l-5-5" />
     </svg>
   );
 }

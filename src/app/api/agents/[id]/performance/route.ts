@@ -177,28 +177,32 @@ export async function GET(
         ))
         .orderBy(desc(positions.closedAt));
 
-      // Start with initial balance at agent creation
-      const agentCreatedAt = new Date(agent.createdAt).getTime();
-      dataPoints.push({
-        timestamp: agentCreatedAt,
-        value: initialBalance,
-      });
+      // Only generate chart data if there are actual closed positions
+      if (closedPositions.length > 0) {
+        // Start with initial balance at agent creation
+        const agentCreatedAt = new Date(agent.createdAt).getTime();
+        dataPoints.push({
+          timestamp: agentCreatedAt,
+          value: initialBalance,
+        });
 
-      // Add data points for each closed position
-      let runningBalance = initialBalance;
-      const sortedPositions = [...closedPositions].reverse();
+        // Add data points for each closed position
+        let runningBalance = initialBalance;
+        const sortedPositions = [...closedPositions].reverse();
 
-      for (const pos of sortedPositions) {
-        const realizedPnl = parseFloat(pos.realizedPnl || '0');
-        runningBalance += realizedPnl;
+        for (const pos of sortedPositions) {
+          const realizedPnl = parseFloat(pos.realizedPnl || '0');
+          runningBalance += realizedPnl;
 
-        if (pos.closedAt) {
-          dataPoints.push({
-            timestamp: new Date(pos.closedAt).getTime(),
-            value: runningBalance,
-          });
+          if (pos.closedAt) {
+            dataPoints.push({
+              timestamp: new Date(pos.closedAt).getTime(),
+              value: runningBalance,
+            });
+          }
         }
       }
+      // If no closed positions, dataPoints stays empty and chart will show empty state
     }
 
     // Calculate unrealized P&L from open positions
@@ -221,15 +225,15 @@ export async function GET(
     if (dataPoints.length > 0) {
       // Use the last data point value as the current balance
       actualCurrentBalance = dataPoints[dataPoints.length - 1].value;
+
+      // Add current point with unrealized P&L factored in (only if we have trading history)
+      dataPoints.push({
+        timestamp: Date.now(),
+        value: actualCurrentBalance + unrealizedPnl,
+      });
     }
 
-    // Add current point with unrealized P&L factored in
-    dataPoints.push({
-      timestamp: Date.now(),
-      value: actualCurrentBalance + unrealizedPnl,
-    });
-
-    // Interpolate to get smooth chart data
+    // Interpolate to get smooth chart data (returns empty array if no data points)
     const smoothDataPoints = interpolateDataPoints(dataPoints, 100);
 
     // Calculate total P&L

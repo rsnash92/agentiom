@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { TerminalPanel, SimpleAgentSettings, AgentPerformanceChart, AgentInfoCard } from '@/components/trading';
-import { useAgent } from '@/lib/hooks';
+import { useAgent, useAgents } from '@/lib/hooks';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AgentSetupChecklist } from '@/components/agent';
 
 function AgentTradingPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   // Support both path param (/agents/[id]) and query param (?agentId=)
   const pathId = params.id as string;
@@ -19,6 +20,9 @@ function AgentTradingPageContent() {
 
   // Fetch the current agent's data
   const { agent, isLoading: agentLoading, error: agentError, toggleStatus } = useAgent(agentId);
+
+  // Fetch all agents for the switcher
+  const { agents: allAgents } = useAgents();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSetupChecklist, setShowSetupChecklist] = useState(false);
@@ -124,6 +128,8 @@ function AgentTradingPageContent() {
           status={agent.status as 'active' | 'paused'}
           isDemo={agent.isDemo}
           onToggleStatus={toggleStatus}
+          otherAgents={allAgents.map(a => ({ id: a.id, name: a.name, status: a.status }))}
+          onSelectAgent={(id) => router.push(`/agents/${id}`)}
         />
 
         {/* Performance Chart Panel */}
