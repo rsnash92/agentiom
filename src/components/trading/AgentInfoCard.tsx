@@ -90,14 +90,14 @@ export function AgentInfoCard({
   }, [agentId, getAccessToken]);
 
   return (
-    <div className="panel px-4 py-2 flex items-center gap-4">
+    <div className="panel px-3 sm:px-4 py-2 flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-4">
       {/* Agent avatar/icon */}
       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
         <AgentIcon className="w-4 h-4 text-primary" />
       </div>
 
       {/* Agent name and balance with dropdown */}
-      <div className="min-w-0 relative" ref={dropdownRef}>
+      <div className="min-w-0 relative flex-1 sm:flex-none" ref={dropdownRef}>
         <button
           onClick={() => otherAgents.length > 0 && setShowAgentDropdown(!showAgentDropdown)}
           className={`flex items-center gap-1 text-sm font-medium text-foreground truncate ${otherAgents.length > 0 ? 'hover:text-primary cursor-pointer' : ''}`}
@@ -108,7 +108,7 @@ export function AgentInfoCard({
           )}
         </button>
         <div className="flex items-baseline gap-2">
-          <span className="text-base font-bold text-foreground">
+          <span className="text-sm sm:text-base font-bold text-foreground">
             ${currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
           {unrealizedPnl !== 0 && (
@@ -145,53 +145,50 @@ export function AgentInfoCard({
         )}
       </div>
 
-      {/* Status badges */}
-      <div className="flex items-center gap-2 ml-auto">
+      {/* Status badges - wrap on mobile */}
+      <div className="flex items-center gap-1.5 sm:gap-2 ml-auto order-first sm:order-none w-full sm:w-auto justify-end sm:justify-start">
         {/* Running/Paused status */}
         <button
           onClick={onToggleStatus}
-          className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+          className={`flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-colors ${
             status === 'active'
               ? 'bg-success/20 text-success hover:bg-success/30'
               : 'bg-foreground-subtle/20 text-foreground-muted hover:bg-foreground-subtle/30'
           }`}
         >
           {status === 'active' && (
-            <span className="relative flex h-2 w-2">
+            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-success"></span>
             </span>
           )}
           {status === 'active' ? 'RUNNING' : 'PAUSED'}
         </button>
 
         {/* Demo/Live badge */}
-        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+        <span className={`px-1.5 sm:px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-medium ${
           isDemo
             ? 'bg-blue-500/20 text-blue-400'
             : 'bg-primary/20 text-primary'
         }`}>
-          {isDemo ? 'DEMO TRADING' : 'LIVE TRADING'}
+          {isDemo ? 'DEMO' : 'LIVE'}
         </span>
 
-        {/* Details link */}
+        {/* Details link - hide on very small screens */}
         <Link
           href={`/agents/${agentId}/details`}
-          className="text-[10px] text-foreground-muted hover:text-foreground font-medium ml-1"
+          className="hidden xs:inline text-[9px] sm:text-[10px] text-foreground-muted hover:text-foreground font-medium"
         >
           DETAILS
         </Link>
 
-        {/* Spacer to push New Agent to far right */}
-        <div className="flex-1" />
-
-        {/* New Agent link */}
+        {/* New Agent link - hide on mobile */}
         <Link
           href="/agents/new"
-          className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium"
+          className="hidden sm:flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium ml-1"
         >
           <PlusIcon className="w-3 h-3" />
-          NEW AGENT
+          NEW
         </Link>
       </div>
     </div>

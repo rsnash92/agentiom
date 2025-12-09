@@ -226,12 +226,12 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
   return (
     <div className="h-full flex flex-col">
       {/* Tab Header */}
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-3 text-xs font-medium tracking-wide transition-colors ${
+            className={`px-2.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-medium tracking-wide transition-colors whitespace-nowrap flex-shrink-0 ${
               activeTab === tab.id
                 ? 'text-primary border-b-2 border-primary bg-primary/5'
                 : 'text-foreground-muted hover:text-foreground'
@@ -263,11 +263,11 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
             ) : (
               <>
                 {orders.map((order) => (
-                  <div key={order.id} className="p-4 hover:bg-background-secondary/50 transition-colors">
-                    <div className="flex items-start gap-3">
+                  <div key={order.id} className="p-3 sm:p-4 hover:bg-background-secondary/50 transition-colors">
+                    <div className="flex items-start gap-2 sm:gap-3">
                       {/* Symbol Icon */}
                       <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-black"
+                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] sm:text-xs font-bold text-black"
                         style={{ backgroundColor: SYMBOL_COLORS[order.symbol] || '#666' }}
                       >
                         {order.symbol.charAt(0)}
@@ -275,52 +275,42 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
 
                       {/* Order Details */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-primary">{agentName.toUpperCase()}</span>
-                            <span className="text-xs text-foreground-muted">
-                              {order.action === 'CLOSE' ? 'closed position on' : 'placed a'}
-                            </span>
-                            {order.action !== 'CLOSE' && (
-                              <>
-                                <span className={`text-xs font-semibold ${order.action === 'BUY' ? 'text-success' : 'text-error'}`}>
-                                  {order.action}
-                                </span>
-                                <span className="text-xs text-foreground-muted">order on</span>
-                              </>
-                            )}
-                            <span
-                              className="text-xs font-medium px-1.5 py-0.5 rounded"
-                              style={{ backgroundColor: `${SYMBOL_COLORS[order.symbol]}20`, color: SYMBOL_COLORS[order.symbol] || '#666' }}
-                            >
-                              {order.symbol}
-                            </span>
-                          </div>
-                          <span className="text-xs text-foreground-subtle">{formatTime(order.timestamp)}</span>
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-1.5 sm:mb-2">
+                          <span className="text-[10px] sm:text-xs font-medium text-primary">{agentName.toUpperCase()}</span>
+                          <span className={`text-[10px] sm:text-xs font-semibold ${order.action === 'BUY' ? 'text-success' : order.action === 'SELL' ? 'text-error' : 'text-foreground-muted'}`}>
+                            {order.action}
+                          </span>
+                          <span
+                            className="text-[10px] sm:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded"
+                            style={{ backgroundColor: `${SYMBOL_COLORS[order.symbol]}20`, color: SYMBOL_COLORS[order.symbol] || '#666' }}
+                          >
+                            {order.symbol}
+                          </span>
+                          <span className="text-[10px] sm:text-xs text-foreground-subtle ml-auto">{formatTime(order.timestamp)}</span>
                         </div>
 
-                        {/* Order Stats */}
-                        <div className="grid grid-cols-5 gap-4 text-xs">
+                        {/* Order Stats - Mobile: 2 cols, Desktop: 5 cols */}
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-4 text-[10px] sm:text-xs">
                           <div>
-                            <span className="text-foreground-subtle">Price:</span>
-                            <span className="ml-2 text-foreground font-medium">${order.price.toLocaleString()}</span>
+                            <span className="text-foreground-subtle">Price: </span>
+                            <span className="text-foreground font-medium">${order.price.toLocaleString()}</span>
                           </div>
                           <div>
-                            <span className="text-foreground-subtle">Quantity:</span>
-                            <span className="ml-2 text-foreground font-medium">{order.quantity.toFixed(4)}</span>
+                            <span className="text-foreground-subtle">Size: </span>
+                            <span className="text-foreground font-medium">${order.filledAmount.toFixed(2)}</span>
                           </div>
                           <div>
-                            <span className="text-foreground-subtle">Size:</span>
-                            <span className="ml-2 text-foreground font-medium">${order.filledAmount.toFixed(2)}</span>
+                            <span className="text-foreground-subtle">Qty: </span>
+                            <span className="text-foreground font-medium">{order.quantity.toFixed(4)}</span>
                           </div>
                           <div>
-                            <span className="text-foreground-subtle">Leverage:</span>
-                            <span className="ml-2 text-foreground font-medium">{order.leverage}x</span>
+                            <span className="text-foreground-subtle">Lev: </span>
+                            <span className="text-foreground font-medium">{order.leverage}x</span>
                           </div>
                           {order.realizedPnl !== undefined && order.action === 'CLOSE' && (
-                            <div>
-                              <span className="text-foreground-subtle">P&L:</span>
-                              <span className={`ml-2 font-medium ${order.realizedPnl >= 0 ? 'text-success' : 'text-error'}`}>
+                            <div className="col-span-2 sm:col-span-1">
+                              <span className="text-foreground-subtle">P&L: </span>
+                              <span className={`font-medium ${order.realizedPnl >= 0 ? 'text-success' : 'text-error'}`}>
                                 {order.realizedPnl >= 0 ? '+' : ''}${order.realizedPnl.toFixed(2)}
                               </span>
                             </div>
@@ -351,25 +341,25 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
               </div>
             ) : (
               messages.map((message) => (
-                <div key={message.id} className="p-4 hover:bg-background-secondary/50 transition-colors">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                      <AgentIcon className="w-4 h-4 text-primary" />
+                <div key={message.id} className="p-3 sm:p-4 hover:bg-background-secondary/50 transition-colors">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <AgentIcon className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-primary">{agentName.toUpperCase()}</span>
-                        <span className="text-xs text-foreground-subtle">{formatTime(message.timestamp)}</span>
+                        <span className="text-[10px] sm:text-xs font-medium text-primary">{agentName.toUpperCase()}</span>
+                        <span className="text-[10px] sm:text-xs text-foreground-subtle">{formatTime(message.timestamp)}</span>
                       </div>
-                      <p className={`text-sm text-foreground leading-relaxed ${!message.isExpanded ? 'line-clamp-3' : ''}`}>
+                      <p className={`text-xs sm:text-sm text-foreground leading-relaxed ${!message.isExpanded ? 'line-clamp-3' : ''}`}>
                         {message.content}
                       </p>
                       {message.content.length > 150 && (
                         <button
                           onClick={() => toggleMessageExpand(message.id)}
-                          className="text-xs text-foreground-muted hover:text-foreground mt-1"
+                          className="text-[10px] sm:text-xs text-foreground-muted hover:text-foreground mt-1"
                         >
-                          {message.isExpanded ? 'Show less' : 'Click to expand'}
+                          {message.isExpanded ? 'Show less' : 'Expand'}
                         </button>
                       )}
                     </div>
@@ -379,8 +369,8 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
             )}
 
             {/* Optimize Prompt Button */}
-            <div className="p-4 flex justify-center">
-              <button className="px-6 py-2 border-2 border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary/10 transition-colors">
+            <div className="p-3 sm:p-4 flex justify-center">
+              <button className="px-4 sm:px-6 py-2 border-2 border-primary text-primary rounded-lg text-xs sm:text-sm font-medium hover:bg-primary/10 transition-colors">
                 Optimize Prompt
               </button>
             </div>
@@ -389,36 +379,36 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
 
         {/* Positions Tab */}
         {activeTab === 'positions' && !isLoading && (
-          <div className="p-4">
+          <div className="p-3 sm:p-4">
             {positions.length === 0 ? (
-              <div className="text-center text-foreground-muted text-sm py-8">
+              <div className="text-center text-foreground-muted text-xs sm:text-sm py-6 sm:py-8">
                 No open positions
               </div>
             ) : (
               <div className="space-y-2">
                 {positions.map((position) => (
-                  <div key={position.id} className="p-3 bg-background-secondary rounded-lg">
+                  <div key={position.id} className="p-2.5 sm:p-3 bg-background-secondary rounded-lg">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
                         <span
-                          className="text-xs font-medium px-1.5 py-0.5 rounded"
+                          className="text-[10px] sm:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded"
                           style={{ backgroundColor: `${SYMBOL_COLORS[position.symbol]}20`, color: SYMBOL_COLORS[position.symbol] }}
                         >
                           {position.symbol}
                         </span>
-                        <span className={`text-xs font-semibold ${position.side === 'LONG' ? 'text-success' : 'text-error'}`}>
+                        <span className={`text-[10px] sm:text-xs font-semibold ${position.side === 'LONG' ? 'text-success' : 'text-error'}`}>
                           {position.side}
                         </span>
-                        <span className="text-xs text-foreground-muted">{position.leverage}x</span>
+                        <span className="text-[10px] sm:text-xs text-foreground-muted">{position.leverage}x</span>
                       </div>
-                      <span className={`text-sm font-medium ${position.pnl >= 0 ? 'text-success' : 'text-error'}`}>
-                        {position.pnl >= 0 ? '+' : ''}{position.pnl.toFixed(2)} ({position.pnlPct >= 0 ? '+' : ''}{position.pnlPct.toFixed(2)}%)
+                      <span className={`text-xs sm:text-sm font-medium ${position.pnl >= 0 ? 'text-success' : 'text-error'}`}>
+                        {position.pnl >= 0 ? '+' : ''}{position.pnl.toFixed(2)} <span className="hidden sm:inline">({position.pnlPct >= 0 ? '+' : ''}{position.pnlPct.toFixed(2)}%)</span>
                       </span>
                     </div>
-                    <div className="flex items-center justify-between mt-2 text-xs text-foreground-muted">
+                    <div className="flex items-center justify-between mt-1.5 sm:mt-2 text-[10px] sm:text-xs text-foreground-muted">
                       <span>Size: {position.size.toFixed(4)}</span>
                       <span>Entry: ${position.entryPrice.toLocaleString()}</span>
-                      <span>Mark: ${position.markPrice.toLocaleString()}</span>
+                      <span className="hidden sm:inline">Mark: ${position.markPrice.toLocaleString()}</span>
                     </div>
                   </div>
                 ))}

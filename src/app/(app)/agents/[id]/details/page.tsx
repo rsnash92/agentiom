@@ -239,26 +239,26 @@ function AgentDetailsPageContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {/* Back Link */}
         <Link
           href="/agents"
-          className="inline-flex items-center gap-2 text-foreground-muted hover:text-foreground text-sm mb-6"
+          className="inline-flex items-center gap-2 text-foreground-muted hover:text-foreground text-sm mb-4 sm:mb-6"
         >
           <BackIcon className="w-4 h-4" />
           MY AGENTS
         </Link>
 
-        {/* Agent Header */}
-        <div className="flex flex-wrap gap-6 mb-8">
+        {/* Agent Header - Stack on mobile */}
+        <div className="flex flex-col lg:flex-row flex-wrap gap-4 sm:gap-6 mb-6 sm:mb-8">
           {/* Left: Agent Info */}
-          <div className="flex items-start gap-4 min-w-[280px]">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <BotIcon className="w-6 h-6 text-primary" />
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <BotIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-semibold">{agent.name}</h1>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-base sm:text-lg font-semibold">{agent.name}</h1>
                 <span className={`px-2 py-0.5 text-xs font-medium rounded ${
                   agent.status === 'active'
                     ? 'bg-success/20 text-success'
@@ -267,14 +267,11 @@ function AgentDetailsPageContent() {
                   {agent.status === 'active' ? 'RUNNING' : 'PAUSED'}
                 </span>
               </div>
-              <p className="text-sm text-foreground-muted mt-1">
+              <p className="text-xs sm:text-sm text-foreground-muted mt-1">
                 Agent Model: <span className="text-foreground">{getLLMDisplayName(agent.llmProvider)}</span>
               </p>
-              <p className="text-sm text-foreground-muted">
-                Margin Balance: <span className="text-foreground font-mono">{performance?.currentBalance?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '5,000.00'}</span>
-              </p>
-              <p className="text-sm text-foreground-muted">
-                Available Cash: <span className="text-foreground font-mono">{((performance?.currentBalance || 5000) - totalUnrealizedPnl).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <p className="text-xs sm:text-sm text-foreground-muted">
+                Balance: <span className="text-foreground font-mono">{performance?.currentBalance?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '5,000.00'}</span>
               </p>
               <button
                 onClick={() => toggleStatus()}
@@ -284,58 +281,58 @@ function AgentDetailsPageContent() {
                     : 'border-success/50 text-success hover:bg-success/10'
                 }`}
               >
-                {agent.status === 'active' ? 'STOP AGENT' : 'START AGENT'}
+                {agent.status === 'active' ? 'STOP' : 'START'}
               </button>
             </div>
           </div>
 
-          {/* Center: Total P&L */}
-          <div className="flex-1 flex justify-center items-start">
-            <div className="text-center">
-              <p className="text-sm text-foreground-muted">Total P&L:</p>
-              <p className={`text-2xl font-bold ${(performance?.totalPnl || 0) >= 0 ? 'text-success' : 'text-error'}`}>
+          {/* Center: Total P&L - Show inline on mobile */}
+          <div className="flex lg:flex-1 lg:justify-center items-center lg:items-start">
+            <div className="text-left lg:text-center">
+              <p className="text-xs sm:text-sm text-foreground-muted">Total P&L:</p>
+              <p className={`text-xl sm:text-2xl font-bold ${(performance?.totalPnl || 0) >= 0 ? 'text-success' : 'text-error'}`}>
                 {(performance?.totalPnl || 0) >= 0 ? '+' : ''}{performance?.totalPnl?.toFixed(2) || '0.00'}
               </p>
             </div>
           </div>
 
           {/* Right: Config Info */}
-          <div className="min-w-[400px]">
-            <p className="text-sm text-foreground-muted mb-1">
+          <div className="w-full lg:w-auto lg:min-w-[300px] xl:min-w-[400px]">
+            <p className="text-xs sm:text-sm text-foreground-muted mb-1">
               <span className="text-foreground-subtle">Symbols:</span>{' '}
               <span className="text-foreground">
                 {approvedPairs.map(p => `${p}/USDT`).join(', ')}
               </span>
             </p>
-            <p className="text-sm text-foreground-muted mb-3">
+            <p className="text-xs sm:text-sm text-foreground-muted mb-3 line-clamp-2">
               <span className="text-foreground-subtle">Prompt:</span>{' '}
               <span className="text-foreground">
-                {agent.personality || "You haven't generated any trading prompt for your agent yet. The agent is currently trading with the default strategy."}
+                {agent.personality || "Default strategy"}
               </span>
             </p>
             <div className="flex items-center gap-3">
               <Link
                 href={`/agents/${agent.id}`}
-                className="px-4 py-1.5 bg-background-secondary text-foreground text-sm font-medium rounded border border-border hover:bg-background-secondary/80"
+                className="px-3 sm:px-4 py-1.5 bg-background-secondary text-foreground text-xs sm:text-sm font-medium rounded border border-border hover:bg-background-secondary/80"
               >
                 EDIT
               </Link>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="text-sm text-error hover:underline"
+                className="text-xs sm:text-sm text-error hover:underline"
               >
-                Delete Agent
+                Delete
               </button>
             </div>
           </div>
         </div>
 
         {/* Active Positions */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold tracking-wide">ACTIVE POSITIONS</h2>
-            <p className="text-sm">
-              <span className="text-foreground-muted">TOTAL UNREALIZED P&L:</span>{' '}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <h2 className="text-xs sm:text-sm font-semibold tracking-wide">ACTIVE POSITIONS</h2>
+            <p className="text-xs sm:text-sm">
+              <span className="text-foreground-muted">UNREALIZED P&L:</span>{' '}
               <span className={totalUnrealizedPnl >= 0 ? 'text-success' : 'text-error'}>
                 {totalUnrealizedPnl >= 0 ? '+' : ''}{totalUnrealizedPnl.toFixed(2)}
               </span>

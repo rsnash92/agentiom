@@ -89,8 +89,8 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <h2 className="text-sm font-semibold tracking-wide">AGENT SETTINGS</h2>
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-border">
+        <h2 className="text-xs sm:text-sm font-semibold tracking-wide">AGENT SETTINGS</h2>
         {onClose && (
           <button
             onClick={onClose}
@@ -102,31 +102,31 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4 space-y-6">
+      <div className="flex-1 overflow-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
         {/* Symbol Selection */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <label className="text-sm text-foreground-muted">Select Symbol*</label>
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <label className="text-xs sm:text-sm text-foreground-muted">Select Symbol*</label>
             <button
               onClick={selectAll}
-              className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80"
+              className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-primary hover:text-primary/80"
             >
-              <CheckboxIcon checked={selectedSymbols.length === SYMBOLS.length} />
+              <CheckboxIcon checked={selectedSymbols.length === SYMBOLS.length} className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               Select All
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {SYMBOLS.map((symbol) => (
               <button
                 key={symbol.id}
                 onClick={() => toggleSymbol(symbol.id)}
-                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-medium transition-all ${
                   selectedSymbols.includes(symbol.id)
                     ? 'bg-primary text-black'
                     : 'bg-background-secondary text-foreground-muted hover:text-foreground'
                 }`}
               >
-                {symbol.name}
+                {symbol.id}
               </button>
             ))}
           </div>
@@ -134,42 +134,42 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
 
         {/* Prompt */}
         <div>
-          <label className="text-sm text-foreground-muted mb-2 block">Your Prompt for Agent</label>
+          <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block">Your Prompt for Agent</label>
           <div className="relative">
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Enter your trading strategy prompt..."
               maxLength={1000}
-              className="w-full h-32 px-4 py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary resize-none text-sm"
+              className="w-full h-24 sm:h-32 px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary resize-none text-xs sm:text-sm"
             />
-            <span className="absolute bottom-2 right-2 text-xs text-foreground-subtle">
+            <span className="absolute bottom-2 right-2 text-[10px] sm:text-xs text-foreground-subtle">
               {prompt.length}/1000
             </span>
           </div>
         </div>
 
         {/* Run Now Button */}
-        <div className="pt-2">
+        <div className="pt-1 sm:pt-2">
           <button
             onClick={handleRunNow}
             disabled={isExecuting}
-            className="w-full py-3 bg-success/20 text-success font-semibold rounded-lg hover:bg-success/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center gap-2"
+            className="w-full py-2.5 sm:py-3 bg-success/20 text-success font-semibold rounded-lg hover:bg-success/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm flex items-center justify-center gap-2"
           >
             {isExecuting ? (
               <>
-                <span className="w-4 h-4 border-2 border-success border-t-transparent rounded-full animate-spin" />
-                Analyzing Markets...
+                <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-success border-t-transparent rounded-full animate-spin" />
+                Analyzing...
               </>
             ) : (
               <>
-                <PlayIcon className="w-4 h-4" />
+                <PlayIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 RUN NOW
               </>
             )}
           </button>
           {executeResult && (
-            <p className={`text-xs mt-2 text-center ${executeResult.includes('Error') ? 'text-error' : 'text-foreground-muted'}`}>
+            <p className={`text-[10px] sm:text-xs mt-1.5 sm:mt-2 text-center ${executeResult.includes('Error') ? 'text-error' : 'text-foreground-muted'}`}>
               {executeResult}
             </p>
           )}
@@ -177,17 +177,17 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-border flex gap-3">
+      <div className="p-3 sm:p-4 border-t border-border flex gap-2 sm:gap-3">
         <button
           onClick={onClose}
-          className="flex-1 py-2.5 bg-background-secondary text-foreground font-medium rounded-lg hover:bg-background-secondary/80 transition-colors text-sm"
+          className="flex-1 py-2 sm:py-2.5 bg-background-secondary text-foreground font-medium rounded-lg hover:bg-background-secondary/80 transition-colors text-xs sm:text-sm"
         >
           CANCEL
         </button>
         <button
           onClick={handleSave}
           disabled={isSaving || selectedSymbols.length === 0}
-          className="flex-1 py-2.5 bg-primary text-black font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+          className="flex-1 py-2 sm:py-2.5 bg-primary text-black font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm"
         >
           {isSaving ? 'SAVING...' : 'SAVE'}
         </button>
@@ -204,9 +204,9 @@ function CloseIcon({ className }: { className?: string }) {
   );
 }
 
-function CheckboxIcon({ checked, className }: { checked: boolean; className?: string }) {
+function CheckboxIcon({ checked, className = 'w-4 h-4' }: { checked: boolean; className?: string }) {
   return (
-    <svg className={className || 'w-4 h-4'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <rect x="3" y="3" width="18" height="18" rx="2" />
       {checked && <path d="M9 12l2 2 4-4" />}
     </svg>

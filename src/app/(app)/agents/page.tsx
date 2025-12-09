@@ -32,14 +32,14 @@ function AgentsPageContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">My Agents</h1>
-            <p className="text-foreground-muted text-sm mt-1">Manage your AI trading agents</p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-foreground">My Agents</h1>
+            <p className="text-foreground-muted text-xs sm:text-sm mt-1">Manage your AI trading agents</p>
           </div>
-          <Button asChild>
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/agents/new">
               <PlusIcon className="h-4 w-4 mr-2" />
               Create Agent
@@ -56,10 +56,10 @@ function AgentsPageContent() {
 
         {/* Loading State */}
         {isLoading && agents.length === 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="bg-card border border-border h-[280px]">
-                <CardContent className="p-5 animate-pulse">
+              <Card key={i} className="bg-card border border-border h-[200px] sm:h-[280px]">
+                <CardContent className="p-4 sm:p-5 animate-pulse">
                   <div className="flex items-start justify-between mb-4">
                     <div className="h-10 w-10 rounded-lg bg-background-secondary" />
                     <div className="h-5 w-16 rounded bg-background-secondary" />
@@ -80,14 +80,14 @@ function AgentsPageContent() {
 
         {/* Agents Grid */}
         {!isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {agents.map((agent: Agent) => (
               <Link key={agent.id} href={`/agents/${agent.id}`}>
                 <Card className="bg-card border border-border hover:border-border-hover transition-colors cursor-pointer h-full">
-                  <CardContent className="p-5">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <BotIcon className="h-5 w-5 text-primary" />
+                  <CardContent className="p-4 sm:p-5">
+                    <div className="flex items-start justify-between mb-3 sm:mb-4">
+                      <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <BotIcon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                       </div>
                       <button
                         onClick={(e) => handleToggleStatus(e, agent.id)}
@@ -106,44 +106,44 @@ function AgentsPageContent() {
                       </button>
                     </div>
 
-                    <h3 className="text-[15px] font-semibold mb-1">{agent.name}</h3>
-                    <p className="text-xs text-foreground-muted mb-4 line-clamp-2">{agent.strategy}</p>
+                    <h3 className="text-sm sm:text-[15px] font-semibold mb-1">{agent.name}</h3>
+                    <p className="text-[11px] sm:text-xs text-foreground-muted mb-3 sm:mb-4 line-clamp-2">{agent.strategy}</p>
 
-                    <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-border">
                       <div>
-                        <p className="text-xs text-foreground-muted">Max Leverage</p>
-                        <p className="text-sm font-medium font-mono">{agent.policies.maxLeverage}x</p>
+                        <p className="text-[10px] sm:text-xs text-foreground-muted">Max Leverage</p>
+                        <p className="text-xs sm:text-sm font-medium font-mono">{agent.policies.maxLeverage}x</p>
                       </div>
                       <div>
-                        <p className="text-xs text-foreground-muted">Max Position</p>
-                        <p className="text-sm font-medium font-mono">${agent.policies.maxPositionSizeUsd.toLocaleString()}</p>
+                        <p className="text-[10px] sm:text-xs text-foreground-muted">Max Position</p>
+                        <p className="text-xs sm:text-sm font-medium font-mono">${agent.policies.maxPositionSizeUsd.toLocaleString()}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-foreground-muted">Max Drawdown</p>
-                        <p className="text-sm font-medium font-mono">{agent.policies.maxDrawdownPct}%</p>
+                        <p className="text-[10px] sm:text-xs text-foreground-muted">Max Drawdown</p>
+                        <p className="text-xs sm:text-sm font-medium font-mono">{agent.policies.maxDrawdownPct}%</p>
                       </div>
                       <div>
-                        <p className="text-xs text-foreground-muted">Interval</p>
-                        <p className="text-sm font-medium font-mono">{agent.executionIntervalSeconds}s</p>
+                        <p className="text-[10px] sm:text-xs text-foreground-muted">Interval</p>
+                        <p className="text-xs sm:text-sm font-medium font-mono">{agent.executionIntervalSeconds}s</p>
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-border">
+                    <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 border-t border-border">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs text-foreground-muted">
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-foreground-muted">
                           <span className="flex items-center gap-1">
                             <ModelIcon className="h-3 w-3" />
                             {getLLMDisplayName(agent.llmProvider)}
                           </span>
                           <span>•</span>
-                          <span>
+                          <span className="truncate max-w-[80px] sm:max-w-none">
                             {formatPairs(agent.policies.approvedPairs).join(', ')}
                           </span>
                         </div>
                         <Link
                           href={`/agents/${agent.id}/details`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-xs text-primary hover:underline"
+                          className="text-[10px] sm:text-xs text-primary hover:underline flex-shrink-0"
                         >
                           DETAILS
                         </Link>
@@ -157,13 +157,13 @@ function AgentsPageContent() {
             {/* Create New Agent Card */}
             <Link href="/agents/new">
               <Card className="bg-card border border-border border-dashed hover:border-border-hover transition-colors cursor-pointer h-full">
-                <CardContent className="p-5 h-full flex flex-col items-center justify-center text-center min-h-[280px]">
-                  <div className="h-10 w-10 rounded-lg bg-background-secondary flex items-center justify-center mb-4">
-                    <PlusIcon className="h-5 w-5 text-foreground-muted" />
+                <CardContent className="p-4 sm:p-5 h-full flex flex-col items-center justify-center text-center min-h-[200px] sm:min-h-[280px]">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-background-secondary flex items-center justify-center mb-3 sm:mb-4">
+                    <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5 text-foreground-muted" />
                   </div>
-                  <h3 className="text-[15px] font-semibold mb-1">Create New Agent</h3>
-                  <p className="text-xs text-foreground-muted">
-                    Deploy a new AI trading agent with custom strategy
+                  <h3 className="text-sm sm:text-[15px] font-semibold mb-1">Create New Agent</h3>
+                  <p className="text-[11px] sm:text-xs text-foreground-muted">
+                    Deploy a new AI trading agent
                   </p>
                 </CardContent>
               </Card>
@@ -173,15 +173,15 @@ function AgentsPageContent() {
 
         {/* Empty State */}
         {!isLoading && agents.length === 0 && !error && (
-          <div className="text-center py-12">
-            <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <BotIcon className="h-8 w-8 text-primary" />
+          <div className="text-center py-8 sm:py-12 px-4">
+            <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3 sm:mb-4">
+              <BotIcon className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">No agents yet</h3>
-            <p className="text-foreground-muted text-sm mb-6">
+            <h3 className="text-base sm:text-lg font-semibold mb-2">No agents yet</h3>
+            <p className="text-foreground-muted text-xs sm:text-sm mb-4 sm:mb-6">
               Create your first AI trading agent to get started
             </p>
-            <Button asChild>
+            <Button asChild className="w-full sm:w-auto">
               <Link href="/agents/new">
                 <PlusIcon className="h-4 w-4 mr-2" />
                 Create Your First Agent

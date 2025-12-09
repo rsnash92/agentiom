@@ -105,7 +105,7 @@ function AgentTradingPageContent() {
   const agentBalance = parseFloat(agent.demoBalance || '5000');
 
   return (
-    <div className="h-[calc(100vh-56px)] flex bg-background overflow-hidden p-1 panel-gap">
+    <div className="min-h-[calc(100vh-56px)] lg:h-[calc(100vh-56px)] flex flex-col lg:flex-row bg-background lg:overflow-hidden p-2 sm:p-1 gap-2 sm:gap-1">
       {/* Agent Setup Checklist Modal */}
       {showSetupChecklist && agent && (
         <AgentSetupChecklist
@@ -119,7 +119,7 @@ function AgentTradingPageContent() {
       )}
 
       {/* Left Section - Agent Info + Chart + Terminal */}
-      <div className="flex-1 flex flex-col panel-gap min-w-0">
+      <div className="flex-1 flex flex-col gap-2 sm:gap-1 min-w-0">
         {/* Agent Info Bar */}
         <AgentInfoCard
           agentId={agent.id}
@@ -135,7 +135,7 @@ function AgentTradingPageContent() {
         {/* Performance Chart Panel */}
         <div
           ref={chartContainerRef}
-          className={`panel flex-1 min-h-[300px] ${isFullscreen ? 'fixed inset-0 z-50 bg-background p-4 rounded-none' : ''}`}
+          className={`panel flex-1 min-h-[250px] sm:min-h-[300px] ${isFullscreen ? 'fixed inset-0 z-50 bg-background p-4 rounded-none' : ''}`}
         >
           <AgentPerformanceChart
             agentId={agent.id}
@@ -146,7 +146,7 @@ function AgentTradingPageContent() {
 
         {/* Terminal Panel - 3 Tabs: Order History, Model Chat, Positions */}
         {!isFullscreen && (
-          <div className="panel h-[280px] overflow-hidden">
+          <div className="panel min-h-[240px] sm:h-[280px] overflow-hidden">
             <TerminalPanel
               agentId={agent.id}
               agentName={agent.name}
@@ -155,8 +155,8 @@ function AgentTradingPageContent() {
         )}
       </div>
 
-      {/* Right Panel - Simple Agent Settings (full height) */}
-      <div className="w-[320px] panel flex flex-col overflow-hidden">
+      {/* Right Panel - Simple Agent Settings (full height on desktop, auto on mobile) */}
+      <div className="w-full lg:w-[320px] panel flex flex-col overflow-hidden">
         <SimpleAgentSettings agentId={agent.id} />
       </div>
     </div>

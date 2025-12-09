@@ -169,11 +169,11 @@ function CreateAgentModal() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
+      <div className="min-h-screen bg-background/80 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-4">
+        <div className="w-full max-w-lg bg-card border border-border rounded-xl sm:rounded-2xl shadow-2xl overflow-hidden my-2 sm:my-0">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <h1 className="text-lg font-semibold tracking-wide">CREATE AGENT</h1>
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
+            <h1 className="text-base sm:text-lg font-semibold tracking-wide">CREATE AGENT</h1>
             <button
               onClick={handleClose}
               className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-background-secondary transition-colors"
@@ -183,30 +183,30 @@ function CreateAgentModal() {
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-5 max-h-[calc(100vh-200px)] overflow-y-auto">
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[calc(100vh-140px)] sm:max-h-[calc(100vh-200px)] overflow-y-auto">
             {/* Trading Mode Toggle */}
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setTradingMode('demo')}
-                className={`py-3 px-4 rounded-lg text-sm font-medium transition-all ${
+                className={`py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                   tradingMode === 'demo'
                     ? 'bg-primary/20 border-2 border-primary text-primary'
                     : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
                 }`}
               >
                 <div>DEMO TRADING</div>
-                <div className="text-xs opacity-70">(FREE FUND 5000U)</div>
+                <div className="text-[10px] sm:text-xs opacity-70">(FREE 5000U)</div>
               </button>
               <button
                 onClick={() => setTradingMode('live')}
-                className={`py-3 px-4 rounded-lg text-sm font-medium transition-all ${
+                className={`py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                   tradingMode === 'live'
                     ? 'bg-primary/20 border-2 border-primary text-primary'
                     : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
                 }`}
               >
                 <div>LIVE TRADING</div>
-                <div className="text-xs opacity-70">(HYPERLIQUID)</div>
+                <div className="text-[10px] sm:text-xs opacity-70">(HYPERLIQUID)</div>
               </button>
             </div>
 
@@ -214,39 +214,39 @@ function CreateAgentModal() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setHasInviteCode(true)}
-                className={`py-2.5 px-4 rounded-lg text-xs font-medium transition-all ${
+                className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-lg text-[10px] sm:text-xs font-medium transition-all ${
                   hasInviteCode
                     ? 'bg-primary/20 border-2 border-primary text-primary'
                     : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
                 }`}
               >
-                I HAVE<br />INVITATION CODE
+                I HAVE<br />INVITE CODE
               </button>
               <button
                 onClick={() => setHasInviteCode(false)}
-                className={`py-2.5 px-4 rounded-lg text-xs font-medium transition-all ${
+                className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-lg text-[10px] sm:text-xs font-medium transition-all ${
                   !hasInviteCode
                     ? 'bg-primary/20 border-2 border-primary text-primary'
                     : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
                 }`}
               >
-                I DO NOT HAVE<br />INVITATION CODE
+                NO INVITE<br />CODE
               </button>
             </div>
 
             {hasInviteCode ? (
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <label className="text-sm text-foreground-muted">Invitation Code (optional during development)</label>
-                  <HelpIcon className="w-4 h-4 text-foreground-subtle" />
+                  <label className="text-xs sm:text-sm text-foreground-muted">Invitation Code (optional)</label>
+                  <HelpIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-foreground-subtle" />
                 </div>
                 <div className="relative">
                   <input
                     type="text"
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                    placeholder="ENTER INVITATION CODE"
-                    className={`w-full px-4 py-3 bg-background border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none uppercase tracking-wider ${
+                    placeholder="ENTER CODE"
+                    className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-background border rounded-lg text-sm sm:text-base text-foreground placeholder:text-foreground-subtle focus:outline-none uppercase tracking-wider ${
                       inviteCodeValid === true
                         ? 'border-success'
                         : inviteCodeValid === false
@@ -259,32 +259,32 @@ function CreateAgentModal() {
                   </button>
                 </div>
                 {inviteCodeError && (
-                  <p className="text-xs text-error mt-1">{inviteCodeError}</p>
+                  <p className="text-[10px] sm:text-xs text-error mt-1">{inviteCodeError}</p>
                 )}
                 {inviteCodeValid && (
-                  <p className="text-xs text-success mt-1">Valid invitation code</p>
+                  <p className="text-[10px] sm:text-xs text-success mt-1">Valid invitation code</p>
                 )}
               </div>
             ) : (
-              <div className="p-4 bg-foreground-subtle/10 border border-foreground-subtle/20 rounded-lg">
-                <p className="text-sm text-foreground-muted">
-                  Invite codes are disabled during development. You can create agents without one.
+              <div className="p-3 sm:p-4 bg-foreground-subtle/10 border border-foreground-subtle/20 rounded-lg">
+                <p className="text-xs sm:text-sm text-foreground-muted">
+                  Invite codes disabled during development.
                 </p>
               </div>
             )}
 
             {/* Agent Name */}
             <div>
-              <label className="text-sm text-foreground-muted mb-2 block">Agent Name*</label>
+              <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block">Agent Name*</label>
               <div className="relative">
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value.slice(0, 20))}
                   placeholder="ENTER AGENT NAME"
-                  className="w-full px-4 py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary uppercase tracking-wider"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-border rounded-lg text-sm sm:text-base text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary uppercase tracking-wider"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-foreground-subtle">
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-foreground-subtle">
                   {name.length}/20
                 </span>
               </div>
@@ -292,12 +292,12 @@ function CreateAgentModal() {
 
             {/* Model Selection */}
             <div>
-              <label className="text-sm text-foreground-muted mb-2 block">Select Model*</label>
+              <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block">Select Model*</label>
               <div className="relative">
                 <select
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value)}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-border rounded-lg text-sm sm:text-base text-foreground focus:outline-none focus:border-primary appearance-none cursor-pointer"
                 >
                   {MODELS.map((model) => (
                     <option key={model.id} value={model.id}>
@@ -305,38 +305,38 @@ function CreateAgentModal() {
                     </option>
                   ))}
                 </select>
-                <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground-muted pointer-events-none" />
+                <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-foreground-muted pointer-events-none" />
               </div>
             </div>
 
             {/* Symbol Selection */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm text-foreground-muted">Select Symbol*</label>
+              <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                <label className="text-xs sm:text-sm text-foreground-muted">Select Symbol*</label>
                 <button
                   onClick={selectAllSymbols}
-                  className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80"
+                  className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-primary hover:text-primary/80"
                 >
-                  <div className={`w-4 h-4 border rounded flex items-center justify-center ${
+                  <div className={`w-3.5 h-3.5 sm:w-4 sm:h-4 border rounded flex items-center justify-center ${
                     selectedSymbols.length === SYMBOLS.length ? 'bg-primary border-primary' : 'border-foreground-muted'
                   }`}>
-                    {selectedSymbols.length === SYMBOLS.length && <CheckIcon className="w-3 h-3 text-black" />}
+                    {selectedSymbols.length === SYMBOLS.length && <CheckIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-black" />}
                   </div>
                   Select All
                 </button>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
                 {SYMBOLS.map((symbol) => (
                   <button
                     key={symbol.id}
                     onClick={() => toggleSymbol(symbol.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                       selectedSymbols.includes(symbol.id)
                         ? 'bg-primary/20 border border-primary text-primary'
                         : 'bg-background-secondary border border-transparent text-foreground-muted hover:text-foreground'
                     }`}
                   >
-                    {symbol.name}
+                    {symbol.id}
                   </button>
                 ))}
               </div>
@@ -344,16 +344,16 @@ function CreateAgentModal() {
 
             {/* Prompt Design */}
             <div>
-              <label className="text-sm text-foreground-muted mb-2 block">Prompt Design (Optional)</label>
+              <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block">Prompt Design (Optional)</label>
               <div className="relative">
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value.slice(0, 1000))}
                   placeholder={EXAMPLE_PROMPTS}
-                  rows={5}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary resize-none text-sm"
+                  rows={4}
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary resize-none text-xs sm:text-sm"
                 />
-                <span className="absolute right-3 bottom-3 text-xs text-foreground-subtle">
+                <span className="absolute right-3 bottom-2 sm:bottom-3 text-[10px] sm:text-xs text-foreground-subtle">
                   {prompt.length}/1000
                 </span>
               </div>
@@ -362,19 +362,19 @@ function CreateAgentModal() {
             {/* Advanced Settings Toggle */}
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground"
+              className="flex items-center gap-2 text-xs sm:text-sm text-foreground-muted hover:text-foreground"
             >
-              <ChevronDownIcon className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+              <ChevronDownIcon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
               Advanced Settings
             </button>
 
             {/* Advanced Settings */}
             {showAdvanced && (
-              <div className="space-y-4 p-4 bg-background rounded-lg border border-border">
+              <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 bg-background rounded-lg border border-border">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm text-foreground-muted">Max Leverage</label>
-                    <span className="text-sm font-mono text-foreground">{maxLeverage}x</span>
+                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                    <label className="text-xs sm:text-sm text-foreground-muted">Max Leverage</label>
+                    <span className="text-xs sm:text-sm font-mono text-foreground">{maxLeverage}x</span>
                   </div>
                   <input
                     type="range"
@@ -386,21 +386,21 @@ function CreateAgentModal() {
                   />
                 </div>
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm text-foreground-muted">Max Position Size (USD)</label>
-                    <span className="text-sm font-mono text-foreground">${maxPositionSize}</span>
+                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                    <label className="text-xs sm:text-sm text-foreground-muted">Max Position (USD)</label>
+                    <span className="text-xs sm:text-sm font-mono text-foreground">${maxPositionSize}</span>
                   </div>
                   <input
                     type="number"
                     value={maxPositionSize}
                     onChange={(e) => setMaxPositionSize(Number(e.target.value))}
-                    className="w-full px-4 py-2 bg-background-secondary border border-border rounded-lg text-foreground focus:outline-none focus:border-primary"
+                    className="w-full px-3 sm:px-4 py-2 bg-background-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm text-foreground-muted">Max Drawdown</label>
-                    <span className="text-sm font-mono text-foreground">{maxDrawdown}%</span>
+                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                    <label className="text-xs sm:text-sm text-foreground-muted">Max Drawdown</label>
+                    <span className="text-xs sm:text-sm font-mono text-foreground">{maxDrawdown}%</span>
                   </div>
                   <input
                     type="range"
@@ -416,23 +416,23 @@ function CreateAgentModal() {
 
             {/* Error */}
             {error && (
-              <div className="p-3 bg-error/10 border border-error/20 rounded-lg text-sm text-error">
+              <div className="p-2.5 sm:p-3 bg-error/10 border border-error/20 rounded-lg text-xs sm:text-sm text-error">
                 {error}
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-border">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border">
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="w-full py-3.5 bg-primary text-black font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all tracking-wide"
+              className="w-full py-3 sm:py-3.5 bg-primary text-black text-sm sm:text-base font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all tracking-wide"
             >
               {isSubmitting ? 'CREATING...' : 'CREATE AGENT'}
             </button>
-            <p className="text-xs text-center text-foreground-subtle mt-3">
-              AGENTS PAUSE AUTOMATICALLY AFTER 3 DAYS OF NO LOGIN ACTIVITY.
+            <p className="text-[10px] sm:text-xs text-center text-foreground-subtle mt-2 sm:mt-3">
+              AGENTS PAUSE AFTER 3 DAYS OF NO LOGIN.
             </p>
           </div>
         </div>
