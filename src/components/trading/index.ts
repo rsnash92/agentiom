@@ -20,3 +20,5 @@ export { ApiKeysPanel } from './ApiKeysPanel';
 export { MarketSelector } from './MarketSelector';
 export { TerminalPanel } from './TerminalPanel';
 export { SimpleAgentSettings } from './SimpleAgentSettings';
+export { AgentPerformanceChart } from './AgentPerformanceChart';
+export { AgentInfoCard } from './AgentInfoCard';
