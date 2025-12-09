@@ -131,6 +131,20 @@ export function AgentPerformanceChart({
     );
   }
 
+  // Show empty state if no data
+  if (!performanceData || chartData.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-foreground-muted">
+        <svg className="w-10 h-10 mb-2 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M3 3v18h18" />
+          <path d="M7 14l4-4 4 4 6-6" />
+        </svg>
+        <p className="text-sm">No performance data yet</p>
+        <p className="text-xs mt-1">Start trading to see your chart</p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Chart Controls */}

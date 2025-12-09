@@ -23,12 +23,12 @@ export function AgentInfoCard({
 }: AgentInfoCardProps) {
   const { getAccessToken } = usePrivy();
   const [currentBalance, setCurrentBalance] = useState(initialBalance);
-  const agentIdRef = useRef(agentId);
+  const [unrealizedPnl, setUnrealizedPnl] = useState(0);
 
-  // Update ref when agentId changes
+  // Reset balance when initialBalance prop changes (e.g. agent switch)
   useEffect(() => {
-    agentIdRef.current = agentId;
-  }, [agentId]);
+    setCurrentBalance(initialBalance);
+  }, [initialBalance]);
 
   // Fetch real-time balance from performance API
   useEffect(() => {
@@ -37,13 +37,16 @@ export function AgentInfoCard({
     const fetchBalance = async () => {
       try {
         const token = await getAccessToken();
-        const response = await fetch(`/api/agents/${agentIdRef.current}/performance`, {
+        const response = await fetch(`/api/agents/${agentId}/performance`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (response.ok && isMounted) {
           const data = await response.json();
           if (data.currentBalance !== undefined) {
             setCurrentBalance(data.currentBalance);
+          }
+          if (data.unrealizedPnl !== undefined) {
+            setUnrealizedPnl(data.unrealizedPnl);
           }
         }
       } catch (error) {
@@ -73,8 +76,15 @@ export function AgentInfoCard({
       {/* Agent name and balance */}
       <div className="min-w-0">
         <h2 className="text-sm font-medium text-foreground truncate">{agentName}</h2>
-        <div className="text-base font-bold text-foreground">
-          {currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <div className="flex items-baseline gap-2">
+          <span className="text-base font-bold text-foreground">
+            ${currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          {unrealizedPnl !== 0 && (
+            <span className={`text-xs font-medium ${unrealizedPnl >= 0 ? 'text-success' : 'text-error'}`}>
+              {unrealizedPnl >= 0 ? '+' : ''}{unrealizedPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          )}
         </div>
       </div>
 
