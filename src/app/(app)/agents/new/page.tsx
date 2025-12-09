@@ -1,436 +1,490 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePrivy } from '@privy-io/react-auth';
 import { useAgents } from '@/lib/hooks';
 import { ProtectedRoute } from '@/components/auth';
 
-// Template types
-interface AgentTemplate {
-  id: string;
-  name: string;
-  description: string;
-  tasks: number;
-  triggers: number;
-  personality: string;
-  strategy: string;
-}
-
-// Strategy templates
-const agentTemplates: AgentTemplate[] = [
-  {
-    id: 'bollinger-band-range',
-    name: 'Bollinger Band Range Trader',
-    description: 'Trades mean reversion within Bollinger Bands. Executes longs at lower band and shorts at upper band in ranging markets.',
-    tasks: 3,
-    triggers: 8,
-    personality: 'I am a professional and disciplined trading agent with a balanced approach to risk and reward. My demeanor is calm, analytical, and methodical. I maintain strict adherence to risk management protocols while seeking profitable opportunities in the crypto markets.',
-    strategy: 'bollinger_bands',
-  },
-  {
-    id: 'momentum',
-    name: 'Momentum Trader',
-    description: 'Follows strong price trends with tight risk management using MACD and RSI confirmation.',
-    tasks: 2,
-    triggers: 8,
-    personality: 'I am an aggressive trend-follower focused on catching big moves. I use technical indicators to identify momentum and ride trends until exhaustion signals appear.',
-    strategy: 'momentum',
-  },
-  {
-    id: 'mean-reversion',
-    name: 'RSI Mean Reversion',
-    description: 'Captures short-term reversals by identifying extreme RSI levels across multiple timeframes.',
-    tasks: 2,
-    triggers: 8,
-    personality: 'I am a precision-focused agent that identifies oversold and overbought conditions using RSI. I capitalize on mean reversion when RSI reaches extreme levels.',
-    strategy: 'mean_reversion',
-  },
-  {
-    id: 'ema-crossover',
-    name: 'EMA Crossover Scalper',
-    description: 'Fast-paced scalping using EMA12/EMA26 crossovers on 15m. Executes multiple quick trades.',
-    tasks: 3,
-    triggers: 0,
-    personality: 'I am an aggressive scalping agent focused on capturing small, quick profits from EMA crossover signals. I trade frequently on short timeframes.',
-    strategy: 'scalper',
-  },
-  {
-    id: 'grid',
-    name: 'Grid Trader',
-    description: 'Places orders at fixed intervals to capture volatility in ranging markets.',
-    tasks: 2,
-    triggers: 4,
-    personality: 'I am a systematic trader that profits from ranging markets. I place buy and sell orders at predetermined price levels to capture small moves.',
-    strategy: 'grid',
-  },
-  {
-    id: 'custom',
-    name: 'Custom Strategy',
-    description: 'Define your own trading personality and strategy from scratch.',
-    tasks: 0,
-    triggers: 0,
-    personality: '',
-    strategy: 'custom',
-  },
+// Available models
+const MODELS = [
+  { id: 'deepseek-chat', name: 'DeepSeek Chat V3.1', icon: '🌊' },
+  { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', icon: '🟣' },
+  { id: 'gpt-4o', name: 'GPT-4o', icon: '🟢' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', icon: '🟡' },
 ];
 
-const COINS = ['BTC', 'ETH', 'SOL', 'ARB', 'OP', 'AVAX', 'DOGE', 'LINK'];
+// Available trading pairs
+const SYMBOLS = [
+  { id: 'BTC', name: 'BTC/USDT' },
+  { id: 'ETH', name: 'ETH/USDT' },
+  { id: 'SOL', name: 'SOL/USDT' },
+  { id: 'BNB', name: 'BNB/USDT' },
+  { id: 'DOGE', name: 'DOGE/USDT' },
+  { id: 'XRP', name: 'XRP/USDT' },
+  { id: 'ARB', name: 'ARB/USDT' },
+  { id: 'HYPE', name: 'HYPE/USDT' },
+];
 
-export default function NewAgentPage() {
+// Example prompts for placeholder
+const EXAMPLE_PROMPTS = `EX:
+"ANALYZE MARKET TRENDS AND OPEN POSITIONS ONLY WITH RSI < 30."
+"ACT LIKE AN EXPERIENCED CRYPTO ANALYST EXPLAINING DECISIONS CLEARLY."
+"FOCUS ON SAFE, LOW RISK TRADING WITH TIGHT STOP LOSSES."`;
+
+function CreateAgentModal() {
   const router = useRouter();
   const { authenticated, login } = usePrivy();
   const { createAgent } = useAgents();
 
-  const [step, setStep] = useState<'template' | 'config' | 'risk'>('template');
-  const [selectedTemplate, setSelectedTemplate] = useState<AgentTemplate | null>(null);
+  // Form state
+  const [tradingMode, setTradingMode] = useState<'demo' | 'live'>('demo');
+  const [hasInviteCode, setHasInviteCode] = useState(true);
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
+  const [inviteCodeError, setInviteCodeError] = useState<string | null>(null);
+  const [isValidatingCode, setIsValidatingCode] = useState(false);
+  const [name, setName] = useState('');
+  const [selectedModel, setSelectedModel] = useState('deepseek-chat');
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(['BTC', 'ETH', 'SOL']);
+  const [prompt, setPrompt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Form state
-  const [name, setName] = useState('');
-  const [personality, setPersonality] = useState('');
-  const [approvedPairs, setApprovedPairs] = useState<string[]>(['BTC', 'ETH']);
+  // Advanced settings
   const [maxLeverage, setMaxLeverage] = useState(10);
-  const [maxPositionSizeUsd, setMaxPositionSizeUsd] = useState(1000);
-  const [maxDrawdownPct, setMaxDrawdownPct] = useState(20);
-  const [llmProvider, setLlmProvider] = useState<'claude' | 'openai' | 'deepseek'>('claude');
+  const [maxPositionSize, setMaxPositionSize] = useState(1000);
+  const [maxDrawdown, setMaxDrawdown] = useState(20);
 
-  const handleSelectTemplate = (template: AgentTemplate) => {
+  // Suppress unused variable warning
+  void isValidatingCode;
+
+  // Validate invite code
+  useEffect(() => {
+    if (tradingMode === 'live' && inviteCode.length >= 4) {
+      const validateCode = async () => {
+        setIsValidatingCode(true);
+        setInviteCodeError(null);
+        try {
+          const response = await fetch('/api/invite-codes/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: inviteCode }),
+          });
+          const data = await response.json();
+          setInviteCodeValid(data.valid);
+          if (!data.valid) {
+            setInviteCodeError(data.error);
+          }
+        } catch {
+          setInviteCodeValid(false);
+          setInviteCodeError('Failed to validate code');
+        } finally {
+          setIsValidatingCode(false);
+        }
+      };
+      const timeout = setTimeout(validateCode, 500);
+      return () => clearTimeout(timeout);
+    } else {
+      setInviteCodeValid(null);
+      setInviteCodeError(null);
+    }
+  }, [inviteCode, tradingMode]);
+
+  const toggleSymbol = (symbol: string) => {
+    setSelectedSymbols(prev =>
+      prev.includes(symbol)
+        ? prev.filter(s => s !== symbol)
+        : [...prev, symbol]
+    );
+  };
+
+  const selectAllSymbols = () => {
+    if (selectedSymbols.length === SYMBOLS.length) {
+      setSelectedSymbols([]);
+    } else {
+      setSelectedSymbols(SYMBOLS.map(s => s.id));
+    }
+  };
+
+  const handleSubmit = async () => {
     if (!authenticated) {
       login();
       return;
     }
-    setSelectedTemplate(template);
-    setName(template.id === 'custom' ? '' : `My ${template.name}`);
-    setPersonality(template.personality);
-    setStep('config');
-  };
 
-  const toggleCoin = (coin: string) => {
-    setApprovedPairs(prev =>
-      prev.includes(coin)
-        ? prev.filter(c => c !== coin)
-        : [...prev, coin]
-    );
-  };
-
-  const handleSubmit = async () => {
-    if (!selectedTemplate || !name || !personality) {
-      setError('Please fill in all required fields');
+    if (!name.trim()) {
+      setError('Please enter an agent name');
       return;
     }
 
-    if (approvedPairs.length === 0) {
+    if (selectedSymbols.length === 0) {
       setError('Please select at least one trading pair');
+      return;
+    }
+
+    if (tradingMode === 'live' && !inviteCodeValid) {
+      setError('Please enter a valid invite code for live trading');
       return;
     }
 
     setIsSubmitting(true);
     setError(null);
 
-    const agent = await createAgent({
-      name,
-      personality,
-      strategy: selectedTemplate.strategy,
-      policies: {
-        maxLeverage,
-        maxPositionSizeUsd,
-        maxPositionSizePct: 10,
-        maxDrawdownPct,
-        approvedPairs,
-      },
-      llmProvider,
-    });
+    try {
+      const agent = await createAgent({
+        name: name.trim(),
+        prompt: prompt.trim() || undefined,
+        isDemo: tradingMode === 'demo',
+        inviteCode: tradingMode === 'live' ? inviteCode : undefined,
+        model: selectedModel,
+        approvedPairs: selectedSymbols,
+        policies: {
+          maxLeverage,
+          maxPositionSizeUsd: maxPositionSize,
+          maxPositionSizePct: 10,
+          maxDrawdownPct: maxDrawdown,
+          approvedPairs: selectedSymbols,
+        },
+      });
 
-    setIsSubmitting(false);
-
-    if (agent) {
-      router.push(`/agents/${agent.id}`);
-    } else {
-      setError('Failed to create agent. Please try again.');
+      if (agent) {
+        router.push(`/agents/${agent.id}`);
+      } else {
+        setError('Failed to create agent. Please try again.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create agent');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const handleClose = () => {
+    router.push('/agents');
   };
 
   return (
     <ProtectedRoute>
-      <div className="min-h-[calc(100vh-56px)] bg-background">
-        <div className="max-w-4xl mx-auto px-6 py-8">
+      <div className="min-h-screen bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
           {/* Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-              <RobotIcon className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold">Create New Agent</h1>
-              <p className="text-foreground-muted text-sm">
-                {step === 'template' && 'Choose a strategy template to get started'}
-                {step === 'config' && 'Configure your agent personality and pairs'}
-                {step === 'risk' && 'Set risk management parameters'}
-              </p>
-            </div>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <h1 className="text-lg font-semibold tracking-wide">CREATE AGENT</h1>
+            <button
+              onClick={handleClose}
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-background-secondary transition-colors"
+            >
+              <CloseIcon className="w-5 h-5" />
+            </button>
           </div>
 
-          {/* Progress */}
-          <div className="flex items-center gap-2 mb-8">
-            {['template', 'config', 'risk'].map((s, i) => (
-              <div key={s} className="flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    s === step
-                      ? 'bg-primary text-black'
-                      : ['template', 'config', 'risk'].indexOf(step) > i
-                      ? 'bg-success text-black'
-                      : 'bg-background-secondary text-foreground-muted'
-                  }`}
-                >
-                  {['template', 'config', 'risk'].indexOf(step) > i ? <CheckIcon className="w-4 h-4" /> : i + 1}
+          {/* Content */}
+          <div className="p-6 space-y-5 max-h-[calc(100vh-200px)] overflow-y-auto">
+            {/* Trading Mode Toggle */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setTradingMode('demo')}
+                className={`py-3 px-4 rounded-lg text-sm font-medium transition-all ${
+                  tradingMode === 'demo'
+                    ? 'bg-primary/20 border-2 border-primary text-primary'
+                    : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
+                }`}
+              >
+                <div>DEMO TRADING</div>
+                <div className="text-xs opacity-70">(FREE FUND 5000U)</div>
+              </button>
+              <button
+                onClick={() => setTradingMode('live')}
+                className={`py-3 px-4 rounded-lg text-sm font-medium transition-all ${
+                  tradingMode === 'live'
+                    ? 'bg-primary/20 border-2 border-primary text-primary'
+                    : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
+                }`}
+              >
+                <div>LIVE TRADING</div>
+                <div className="text-xs opacity-70">(HYPERLIQUID)</div>
+              </button>
+            </div>
+
+            {/* Invite Code Section (for live trading) */}
+            {tradingMode === 'live' && (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setHasInviteCode(true)}
+                    className={`py-2.5 px-4 rounded-lg text-xs font-medium transition-all ${
+                      hasInviteCode
+                        ? 'bg-primary/20 border-2 border-primary text-primary'
+                        : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
+                    }`}
+                  >
+                    I HAVE<br />INVITATION CODE
+                  </button>
+                  <button
+                    onClick={() => setHasInviteCode(false)}
+                    className={`py-2.5 px-4 rounded-lg text-xs font-medium transition-all ${
+                      !hasInviteCode
+                        ? 'bg-primary/20 border-2 border-primary text-primary'
+                        : 'bg-background-secondary border-2 border-transparent text-foreground-muted hover:text-foreground'
+                    }`}
+                  >
+                    I DO NOT HAVE<br />INVITATION CODE
+                  </button>
                 </div>
-                {i < 2 && (
-                  <div className={`w-20 h-0.5 ${['template', 'config', 'risk'].indexOf(step) > i ? 'bg-success' : 'bg-background-secondary'}`} />
-                )}
-              </div>
-            ))}
-          </div>
 
-          {/* Step 1: Template Selection */}
-          {step === 'template' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {agentTemplates.map((template) => (
-                <button
-                  key={template.id}
-                  onClick={() => handleSelectTemplate(template)}
-                  className="p-5 rounded-xl bg-card border border-border hover:border-primary text-left transition-all group"
-                >
-                  <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors">{template.name}</h3>
-                  <p className="text-sm text-foreground-muted mb-4 line-clamp-2">{template.description}</p>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-warning/10 rounded text-xs">
-                      <TasksIcon className="w-3 h-3 text-warning" />
-                      <span>{template.tasks} tasks</span>
+                {hasInviteCode ? (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="text-sm text-foreground-muted">Invitation Code*</label>
+                      <HelpIcon className="w-4 h-4 text-foreground-subtle" />
                     </div>
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-success/10 rounded text-xs">
-                      <TriggersIcon className="w-3 h-3 text-success" />
-                      <span>{template.triggers} triggers</span>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={inviteCode}
+                        onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                        placeholder="ENTER INVITATION CODE"
+                        className={`w-full px-4 py-3 bg-background border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none uppercase tracking-wider ${
+                          inviteCodeValid === true
+                            ? 'border-success'
+                            : inviteCodeValid === false
+                            ? 'border-error'
+                            : 'border-border focus:border-primary'
+                        }`}
+                      />
+                      <button className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground">
+                        <CopyIcon className="w-4 h-4" />
+                      </button>
                     </div>
+                    {inviteCodeError && (
+                      <p className="text-xs text-error mt-1">{inviteCodeError}</p>
+                    )}
+                    {inviteCodeValid && (
+                      <p className="text-xs text-success mt-1">Valid invitation code</p>
+                    )}
                   </div>
-                </button>
-              ))}
-            </div>
-          )}
+                ) : (
+                  <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                    <p className="text-sm text-warning">
+                      An invitation code is required for live trading. Join our Discord to request one.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
 
-          {/* Step 2: Configuration */}
-          {step === 'config' && selectedTemplate && (
-            <div className="bg-card border border-border rounded-xl p-6 space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Agent Name</label>
+            {/* Agent Name */}
+            <div>
+              <label className="text-sm text-foreground-muted mb-2 block">Agent Name*</label>
+              <div className="relative">
                 <input
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="My Trading Agent"
-                  className="w-full px-4 py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary"
+                  onChange={(e) => setName(e.target.value.slice(0, 20))}
+                  placeholder="ENTER AGENT NAME"
+                  className="w-full px-4 py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary uppercase tracking-wider"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Agent Personality</label>
-                <textarea
-                  value={personality}
-                  onChange={(e) => setPersonality(e.target.value)}
-                  placeholder="Describe how your agent should think and trade..."
-                  rows={4}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary resize-none"
-                />
-                <p className="text-xs text-foreground-subtle mt-1">This defines how the AI approaches trading decisions</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-3">Trading Pairs</label>
-                <div className="flex flex-wrap gap-2">
-                  {COINS.map((coin) => (
-                    <button
-                      key={coin}
-                      onClick={() => toggleCoin(coin)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                        approvedPairs.includes(coin)
-                          ? 'bg-primary text-black'
-                          : 'bg-background-secondary text-foreground-muted hover:text-foreground'
-                      }`}
-                    >
-                      {coin}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-3">AI Model</label>
-                <div className="flex gap-3">
-                  {(['claude', 'openai', 'deepseek'] as const).map((provider) => (
-                    <button
-                      key={provider}
-                      onClick={() => setLlmProvider(provider)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        llmProvider === provider
-                          ? 'bg-primary text-black'
-                          : 'bg-background-secondary text-foreground-muted hover:text-foreground'
-                      }`}
-                    >
-                      {provider === 'claude' ? 'Claude' : provider === 'openai' ? 'GPT-4' : 'DeepSeek'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-between pt-4 border-t border-border">
-                <button
-                  onClick={() => setStep('template')}
-                  className="px-6 py-2 text-sm font-medium text-foreground-muted hover:text-foreground"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={() => setStep('risk')}
-                  disabled={!name || !personality}
-                  className="px-6 py-2 text-sm font-medium bg-primary text-black rounded-lg hover:bg-primary/90 disabled:opacity-50"
-                >
-                  Continue
-                </button>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-foreground-subtle">
+                  {name.length}/20
+                </span>
               </div>
             </div>
-          )}
 
-          {/* Step 3: Risk Parameters */}
-          {step === 'risk' && selectedTemplate && (
-            <div className="bg-card border border-border rounded-xl p-6 space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Max Leverage</label>
-                <div className="flex items-center gap-4">
+            {/* Model Selection */}
+            <div>
+              <label className="text-sm text-foreground-muted mb-2 block">Select Model*</label>
+              <div className="relative">
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                >
+                  {MODELS.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.icon} {model.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground-muted pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Symbol Selection */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm text-foreground-muted">Select Symbol*</label>
+                <button
+                  onClick={selectAllSymbols}
+                  className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80"
+                >
+                  <div className={`w-4 h-4 border rounded flex items-center justify-center ${
+                    selectedSymbols.length === SYMBOLS.length ? 'bg-primary border-primary' : 'border-foreground-muted'
+                  }`}>
+                    {selectedSymbols.length === SYMBOLS.length && <CheckIcon className="w-3 h-3 text-black" />}
+                  </div>
+                  Select All
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {SYMBOLS.map((symbol) => (
+                  <button
+                    key={symbol.id}
+                    onClick={() => toggleSymbol(symbol.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      selectedSymbols.includes(symbol.id)
+                        ? 'bg-primary/20 border border-primary text-primary'
+                        : 'bg-background-secondary border border-transparent text-foreground-muted hover:text-foreground'
+                    }`}
+                  >
+                    {symbol.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Prompt Design */}
+            <div>
+              <label className="text-sm text-foreground-muted mb-2 block">Prompt Design (Optional)</label>
+              <div className="relative">
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value.slice(0, 1000))}
+                  placeholder={EXAMPLE_PROMPTS}
+                  rows={5}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary resize-none text-sm"
+                />
+                <span className="absolute right-3 bottom-3 text-xs text-foreground-subtle">
+                  {prompt.length}/1000
+                </span>
+              </div>
+            </div>
+
+            {/* Advanced Settings Toggle */}
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground"
+            >
+              <ChevronDownIcon className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+              Advanced Settings
+            </button>
+
+            {/* Advanced Settings */}
+            {showAdvanced && (
+              <div className="space-y-4 p-4 bg-background rounded-lg border border-border">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm text-foreground-muted">Max Leverage</label>
+                    <span className="text-sm font-mono text-foreground">{maxLeverage}x</span>
+                  </div>
                   <input
                     type="range"
                     min="1"
                     max="50"
                     value={maxLeverage}
                     onChange={(e) => setMaxLeverage(Number(e.target.value))}
-                    className="flex-1"
+                    className="w-full"
                   />
-                  <span className="w-12 text-right font-mono text-foreground">{maxLeverage}x</span>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Max Position Size (USD)</label>
-                <input
-                  type="number"
-                  value={maxPositionSizeUsd}
-                  onChange={(e) => setMaxPositionSizeUsd(Number(e.target.value))}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Max Drawdown (%)</label>
-                <div className="flex items-center gap-4">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm text-foreground-muted">Max Position Size (USD)</label>
+                    <span className="text-sm font-mono text-foreground">${maxPositionSize}</span>
+                  </div>
+                  <input
+                    type="number"
+                    value={maxPositionSize}
+                    onChange={(e) => setMaxPositionSize(Number(e.target.value))}
+                    className="w-full px-4 py-2 bg-background-secondary border border-border rounded-lg text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm text-foreground-muted">Max Drawdown</label>
+                    <span className="text-sm font-mono text-foreground">{maxDrawdown}%</span>
+                  </div>
                   <input
                     type="range"
                     min="5"
                     max="50"
-                    value={maxDrawdownPct}
-                    onChange={(e) => setMaxDrawdownPct(Number(e.target.value))}
-                    className="flex-1"
+                    value={maxDrawdown}
+                    onChange={(e) => setMaxDrawdown(Number(e.target.value))}
+                    className="w-full"
                   />
-                  <span className="w-12 text-right font-mono text-foreground">{maxDrawdownPct}%</span>
-                </div>
-                <p className="text-xs text-foreground-subtle mt-1">Agent pauses if losses exceed this</p>
-              </div>
-
-              {/* Summary */}
-              <div className="bg-background rounded-lg p-4 border border-border">
-                <h3 className="text-sm font-medium text-foreground mb-3">Summary</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Name</span>
-                    <span className="text-foreground">{name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Strategy</span>
-                    <span className="text-foreground">{selectedTemplate.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Pairs</span>
-                    <span className="text-foreground">{approvedPairs.join(', ')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">AI Model</span>
-                    <span className="text-foreground capitalize">{llmProvider}</span>
-                  </div>
                 </div>
               </div>
+            )}
 
-              {error && (
-                <div className="p-3 bg-error/10 border border-error/20 rounded-lg text-sm text-error">
-                  {error}
-                </div>
-              )}
-
-              <div className="flex justify-between pt-4 border-t border-border">
-                <button
-                  onClick={() => setStep('config')}
-                  className="px-6 py-2 text-sm font-medium text-foreground-muted hover:text-foreground"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="px-6 py-2 text-sm font-medium bg-primary text-black rounded-lg hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Creating...' : 'Create Agent'}
-                </button>
+            {/* Error */}
+            {error && (
+              <div className="p-3 bg-error/10 border border-error/20 rounded-lg text-sm text-error">
+                {error}
               </div>
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-border">
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting || (tradingMode === 'live' && !inviteCodeValid)}
+              className="w-full py-3.5 bg-primary text-black font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all tracking-wide"
+            >
+              {isSubmitting ? 'CREATING...' : 'CREATE AGENT'}
+            </button>
+            <p className="text-xs text-center text-foreground-subtle mt-3">
+              AGENTS PAUSE AUTOMATICALLY AFTER 3 DAYS OF NO LOGIN ACTIVITY.
+            </p>
+          </div>
         </div>
       </div>
     </ProtectedRoute>
   );
 }
 
+export default CreateAgentModal;
+
 // Icons
-function RobotIcon({ className }: { className?: string }) {
+function CloseIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="3" y="11" width="18" height="10" rx="2" />
-      <circle cx="12" cy="5" r="2" />
-      <path d="M12 7v4" />
-      <line x1="8" y1="16" x2="8" y2="16" strokeLinecap="round" />
-      <line x1="16" y1="16" x2="16" y2="16" strokeLinecap="round" />
+      <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  );
+}
+
+function HelpIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+function CopyIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M6 9l6 6 6-6" />
     </svg>
   );
 }
 
 function CheckIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-}
-
-function TasksIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <circle cx="12" cy="12" r="4" />
-    </svg>
-  );
-}
-
-function TriggersIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+      <path d="M20 6L9 17l-5-5" />
     </svg>
   );
 }

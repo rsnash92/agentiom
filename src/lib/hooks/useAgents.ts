@@ -7,6 +7,9 @@ export interface Agent {
   id: string;
   userId: string;
   name: string;
+  isDemo: boolean;
+  demoBalance: string | null;
+  inviteCodeUsed: string | null;
   walletAddress: string;
   personality: string;
   strategy: string;
@@ -40,8 +43,13 @@ export interface Agent {
 
 export interface CreateAgentInput {
   name: string;
-  personality: string;
-  strategy: string;
+  prompt?: string; // Combined personality/strategy prompt
+  personality?: string; // Legacy support
+  strategy?: string; // Legacy support
+  isDemo?: boolean;
+  inviteCode?: string;
+  model?: string;
+  approvedPairs?: string[];
   policies?: {
     maxLeverage?: number;
     maxPositionSizeUsd?: number;

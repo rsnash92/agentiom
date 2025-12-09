@@ -35,6 +35,31 @@ export const usersRelations = relations(users, ({ many }) => ({
 }));
 
 // ============================================
+// Invite Codes
+// ============================================
+
+export const inviteCodes = pgTable('invite_codes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  code: text('code').unique().notNull(),
+  createdBy: uuid('created_by').references(() => users.id),
+  usedBy: uuid('used_by').references(() => users.id),
+  maxUses: integer('max_uses').default(1).notNull(),
+  useCount: integer('use_count').default(0).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('invite_code_idx').on(table.code),
+]);
+
+export const inviteCodesRelations = relations(inviteCodes, ({ one }) => ({
+  creator: one(users, {
+    fields: [inviteCodes.createdBy],
+    references: [users.id],
+  }),
+}));
+
+// ============================================
 // Agent Genomes
 // ============================================
 
@@ -89,6 +114,11 @@ export const agents = pgTable('agents', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   name: text('name').notNull(),
+
+  // Demo/Live Mode
+  isDemo: boolean('is_demo').default(true).notNull(),
+  demoBalance: numeric('demo_balance').default('5000'),
+  inviteCodeUsed: text('invite_code_used'),
 
   // Wallet
   walletAddress: text('wallet_address').notNull(),

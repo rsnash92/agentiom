@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrivyClient } from '@privy-io/server-auth';
 import { db } from '@/lib/db';
-import { agents, users } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { agents, users, inviteCodes } from '@/lib/db/schema';
+import { eq, and, gt, or, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { generateAgentWallet } from '@/lib/crypto';
 
@@ -13,9 +13,14 @@ const privy = new PrivyClient(
 
 // Validation schema for creating an agent
 const createAgentSchema = z.object({
-  name: z.string().min(1).max(100),
-  personality: z.string().min(1),
-  strategy: z.string().min(1),
+  name: z.string().min(1).max(20),
+  prompt: z.string().max(1000).optional(), // Combined personality/strategy prompt
+  personality: z.string().optional(), // Legacy support
+  strategy: z.string().optional(), // Legacy support
+  isDemo: z.boolean().default(true),
+  inviteCode: z.string().optional(), // Required for live trading
+  model: z.string().default('deepseek-chat'),
+  approvedPairs: z.array(z.string()).default(['BTC', 'ETH', 'SOL']),
   policies: z.object({
     maxLeverage: z.number().min(1).max(50).default(10),
     maxPositionSizeUsd: z.number().min(0).default(1000),
@@ -113,24 +118,93 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data;
 
+    // For live trading, validate invite code
+    let validatedInviteCode: string | null = null;
+    if (!data.isDemo) {
+      if (!data.inviteCode) {
+        return NextResponse.json(
+          { error: 'Invite code required for live trading' },
+          { status: 400 }
+        );
+      }
+
+      const normalizedCode = data.inviteCode.trim().toUpperCase();
+
+      // Validate and use invite code
+      const [inviteCode] = await db
+        .select()
+        .from(inviteCodes)
+        .where(
+          and(
+            eq(inviteCodes.code, normalizedCode),
+            eq(inviteCodes.isActive, true),
+            or(
+              isNull(inviteCodes.expiresAt),
+              gt(inviteCodes.expiresAt, new Date())
+            )
+          )
+        )
+        .limit(1);
+
+      if (!inviteCode || inviteCode.useCount >= inviteCode.maxUses) {
+        return NextResponse.json(
+          { error: 'Invalid or expired invite code' },
+          { status: 400 }
+        );
+      }
+
+      // Increment use count
+      await db
+        .update(inviteCodes)
+        .set({ useCount: sql`${inviteCodes.useCount} + 1` })
+        .where(eq(inviteCodes.id, inviteCode.id));
+
+      validatedInviteCode = normalizedCode;
+    }
+
     // Generate a real wallet for the agent
     const { address: agentWalletAddress, encryptedKey } = generateAgentWallet();
+
+    // Use prompt field or fall back to personality/strategy
+    const personality = data.prompt || data.personality || 'I am an AI trading agent focused on identifying profitable opportunities while managing risk carefully.';
+    const strategy = data.strategy || 'adaptive';
+
+    // Map model to llmConfig
+    const llmConfig = {
+      primaryModel: data.model,
+      simpleModel: 'gpt-4o-mini',
+      analysisModel: data.model,
+      autoSelect: false,
+      parameters: {
+        temperature: 0.3,
+        topP: 0.9,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        maxTokens: 4096,
+      },
+    };
+
+    const approvedPairs = data.approvedPairs || data.policies?.approvedPairs || ['BTC', 'ETH', 'SOL'];
 
     const [newAgent] = await db
       .insert(agents)
       .values({
         userId: user.id,
         name: data.name,
-        personality: data.personality,
-        strategy: data.strategy,
+        isDemo: data.isDemo,
+        demoBalance: data.isDemo ? '5000' : null,
+        inviteCodeUsed: validatedInviteCode,
+        personality,
+        strategy,
         walletAddress: agentWalletAddress,
         apiKeyEncrypted: encryptedKey,
-        policies: data.policies || {
-          maxLeverage: 10,
-          maxPositionSizeUsd: 1000,
-          maxPositionSizePct: 10,
-          maxDrawdownPct: 20,
-          approvedPairs: ['BTC', 'ETH'],
+        llmConfig,
+        policies: {
+          maxLeverage: data.policies?.maxLeverage || 10,
+          maxPositionSizeUsd: data.policies?.maxPositionSizeUsd || 1000,
+          maxPositionSizePct: data.policies?.maxPositionSizePct || 10,
+          maxDrawdownPct: data.policies?.maxDrawdownPct || 20,
+          approvedPairs,
         },
         executionInterval: data.executionIntervalSeconds || 300,
         status: 'paused',
