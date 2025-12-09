@@ -36,6 +36,7 @@
     "postgres": "^3.4.5",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "recharts": "^3.5.1",
     "tailwind-merge": "^2.6.0",
     "viem": "^2.21.0",
     "wagmi": "^2.14.0",

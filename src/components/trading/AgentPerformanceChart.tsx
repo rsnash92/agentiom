@@ -1,6 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts';
 
 interface AgentPerformanceChartProps {
   agentId: string;
@@ -9,36 +18,66 @@ interface AgentPerformanceChartProps {
 }
 
 interface DataPoint {
-  timestamp: Date;
+  timestamp: number;
   value: number;
+  label: string;
 }
 
-// Generate mock performance data based on current balance
+// Generate realistic performance data - mostly flat with small variations
 function generatePerformanceData(initialBalance: number, currentBalance: number): DataPoint[] {
   const points: DataPoint[] = [];
   const now = new Date();
-  const hoursBack = 8; // Show 8 hours of data
+  const hoursBack = 8;
+  const numPoints = 100;
 
-  // Calculate a smooth path from initial to current
+  // For a new agent, the line should be mostly flat
   const totalChange = currentBalance - initialBalance;
 
-  for (let i = 0; i <= 48; i++) {
-    const timestamp = new Date(now.getTime() - (hoursBack * 60 * 60 * 1000) + (i * (hoursBack * 60 * 60 * 1000) / 48));
+  for (let i = 0; i <= numPoints; i++) {
+    const timestamp = new Date(now.getTime() - (hoursBack * 60 * 60 * 1000) + (i * (hoursBack * 60 * 60 * 1000) / numPoints));
 
-    // Create a realistic looking curve with some variation
-    const progress = i / 48;
+    // Progress from 0 to 1
+    const progress = i / numPoints;
+
+    // Base value progresses linearly from initial to current
     const baseValue = initialBalance + (totalChange * progress);
 
-    // Add small random variations (less at start and end)
-    const variation = Math.sin(i * 0.5) * (initialBalance * 0.001) * (1 - Math.abs(progress - 0.5) * 2);
+    // Add very small random noise (0.01% max) to make it look realistic
+    const noise = (Math.random() - 0.5) * initialBalance * 0.0002;
 
     points.push({
-      timestamp,
-      value: baseValue + variation,
+      timestamp: timestamp.getTime(),
+      value: baseValue + noise,
+      label: timestamp.toLocaleString('en-US', {
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }),
     });
   }
 
   return points;
+}
+
+// Custom tooltip component
+function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: DataPoint }> }) {
+  if (!active || !payload?.length) return null;
+
+  const data = payload[0].payload;
+  const date = new Date(data.timestamp);
+
+  return (
+    <div className="bg-background-secondary border border-border rounded px-3 py-2 text-xs">
+      <div className="text-foreground-muted">
+        {date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })} {date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+      </div>
+      <div className="text-foreground font-medium">
+        Value: ${data.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </div>
+    </div>
+  );
 }
 
 export function AgentPerformanceChart({
@@ -55,61 +94,30 @@ export function AgentPerformanceChart({
     [initialBalance, currentBalance]
   );
 
-  // Calculate chart dimensions and scaling - using larger viewBox for smaller text
-  const chartWidth = 1200;
-  const chartHeight = 500;
-  const padding = { top: 30, right: 80, bottom: 50, left: 80 };
-
-  const innerWidth = chartWidth - padding.left - padding.right;
-  const innerHeight = chartHeight - padding.top - padding.bottom;
-
-  // Calculate min/max for scaling
+  // Calculate domain for Y axis - tight range around the data
   const values = performanceData.map(d => d.value);
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
-  const valueRange = maxValue - minValue || 1;
+  const range = maxValue - minValue || 10;
+  const yMin = Math.floor(minValue - range * 0.2);
+  const yMax = Math.ceil(maxValue + range * 0.2);
 
-  // Add some padding to the range
-  const paddedMin = minValue - valueRange * 0.1;
-  const paddedMax = maxValue + valueRange * 0.1;
-  const paddedRange = paddedMax - paddedMin;
+  // Format X axis ticks
+  const formatXAxis = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  };
 
-  // Scale functions
-  const xScale = (index: number) => padding.left + (index / (performanceData.length - 1)) * innerWidth;
-  const yScale = (value: number) => padding.top + innerHeight - ((value - paddedMin) / paddedRange) * innerHeight;
-
-  // Generate path
-  const pathD = performanceData.map((point, i) => {
-    const x = xScale(i);
-    const y = yScale(point.value);
-    return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-  }).join(' ');
-
-  // Generate area path (for gradient fill)
-  const areaD = pathD + ` L ${xScale(performanceData.length - 1)} ${padding.top + innerHeight} L ${padding.left} ${padding.top + innerHeight} Z`;
-
-  // Y-axis labels
-  const yLabels = [paddedMax, paddedMin + paddedRange * 0.75, paddedMin + paddedRange * 0.5, paddedMin + paddedRange * 0.25, paddedMin];
-
-  // X-axis labels (time)
-  const xLabels = useMemo(() => {
-    const labels: { label: string; index: number }[] = [];
-    const step = Math.floor(performanceData.length / 6);
-    for (let i = 0; i < performanceData.length; i += step) {
-      const point = performanceData[i];
-      labels.push({
-        label: point.timestamp.toLocaleString('en-US', {
-          month: 'short',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        }),
-        index: i
-      });
-    }
-    return labels;
-  }, [performanceData]);
+  // Format Y axis ticks
+  const formatYAxis = (value: number) => {
+    return `$${value.toLocaleString()}`;
+  };
 
   // Suppress unused warning
   void agentId;
@@ -168,91 +176,57 @@ export function AgentPerformanceChart({
       </div>
 
       {/* Chart */}
-      <div className="flex-1 px-1">
-        <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          className="w-full h-full"
-          preserveAspectRatio="xMidYMid meet"
-        >
-          <defs>
-            {/* Gradient for area fill */}
-            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity="0" />
-            </linearGradient>
-          </defs>
+      <div className="flex-1 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart
+            data={performanceData}
+            margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
+          >
+            <defs>
+              <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
 
-          {/* Grid lines */}
-          {yLabels.map((_, i) => (
-            <line
-              key={i}
-              x1={padding.left}
-              y1={padding.top + (i / (yLabels.length - 1)) * innerHeight}
-              x2={chartWidth - padding.right}
-              y2={padding.top + (i / (yLabels.length - 1)) * innerHeight}
-              stroke="currentColor"
-              strokeOpacity="0.1"
+            <CartesianGrid
               strokeDasharray="4 4"
-            />
-          ))}
-
-          {/* Vertical grid lines */}
-          {xLabels.map((label, i) => (
-            <line
-              key={i}
-              x1={xScale(label.index)}
-              y1={padding.top}
-              x2={xScale(label.index)}
-              y2={padding.top + innerHeight}
               stroke="currentColor"
-              strokeOpacity="0.1"
-              strokeDasharray="4 4"
+              strokeOpacity={0.1}
+              vertical={true}
+              horizontal={true}
             />
-          ))}
 
-          {/* Area fill */}
-          <path
-            d={areaD}
-            fill="url(#areaGradient)"
-          />
+            <XAxis
+              dataKey="timestamp"
+              tickFormatter={formatXAxis}
+              tick={{ fill: 'rgb(156, 163, 175)', fontSize: 11 }}
+              tickLine={{ stroke: 'rgb(156, 163, 175)', strokeOpacity: 0.3 }}
+              axisLine={{ stroke: 'rgb(156, 163, 175)', strokeOpacity: 0.3 }}
+              minTickGap={80}
+            />
 
-          {/* Line */}
-          <path
-            d={pathD}
-            fill="none"
-            stroke="rgb(59, 130, 246)"
-            strokeWidth="2"
-          />
+            <YAxis
+              domain={[yMin, yMax]}
+              tickFormatter={formatYAxis}
+              tick={{ fill: 'rgb(156, 163, 175)', fontSize: 11 }}
+              tickLine={{ stroke: 'rgb(156, 163, 175)', strokeOpacity: 0.3 }}
+              axisLine={{ stroke: 'rgb(156, 163, 175)', strokeOpacity: 0.3 }}
+              width={70}
+            />
 
-          {/* Y-axis labels */}
-          {yLabels.map((value, i) => (
-            <text
-              key={i}
-              x={padding.left - 10}
-              y={padding.top + (i / (yLabels.length - 1)) * innerHeight}
-              textAnchor="end"
-              dominantBaseline="middle"
-              className="fill-foreground-muted"
-              fontSize="11"
-            >
-              ${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-            </text>
-          ))}
+            <Tooltip content={<CustomTooltip />} />
 
-          {/* X-axis labels */}
-          {xLabels.map((label, i) => (
-            <text
-              key={i}
-              x={xScale(label.index)}
-              y={chartHeight - 15}
-              textAnchor="middle"
-              className="fill-foreground-muted"
-              fontSize="11"
-            >
-              {label.label}
-            </text>
-          ))}
-        </svg>
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke="rgb(59, 130, 246)"
+              strokeWidth={2}
+              fill="url(#colorValue)"
+              isAnimationActive={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
