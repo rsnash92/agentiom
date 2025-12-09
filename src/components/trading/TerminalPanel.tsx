@@ -143,11 +143,11 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
     }
   }, [agentId, getAccessToken]);
 
-  // Fetch chat messages (analysis logs) from API
+  // Fetch chat messages (decision logs) from API
   const fetchMessages = useCallback(async () => {
     try {
       const token = await getAccessToken();
-      const response = await fetch(`/api/agents/${agentId}/logs?type=analysis`, {
+      const response = await fetch(`/api/agents/${agentId}/logs?type=decision`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
