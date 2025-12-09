@@ -142,11 +142,12 @@ export const agents = pgTable('agents', {
   }>().notNull(),
 
   // Execution Configuration
-  executionIntervalSeconds: integer('execution_interval_seconds').default(300).notNull(),
+  executionInterval: integer('execution_interval').default(300).notNull(),
   dataWeights: jsonb('data_weights').default({}).$type<Record<string, number>>(),
 
   // State
   status: text('status').default('paused').notNull(),
+  lastExecutionAt: timestamp('last_execution_at', { withTimezone: true }),
   genomeId: uuid('genome_id').references(() => agentGenomes.id),
 
   // Metadata

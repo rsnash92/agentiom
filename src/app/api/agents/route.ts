@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
           maxDrawdownPct: 20,
           approvedPairs: ['BTC', 'ETH'],
         },
-        executionIntervalSeconds: data.executionIntervalSeconds,
+        executionInterval: data.executionIntervalSeconds || 300,
         status: 'paused',
       })
       .returning();

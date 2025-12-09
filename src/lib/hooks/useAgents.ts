@@ -289,10 +289,87 @@ export function useAgent(agentId: string | null) {
   }, [authenticated, getAccessToken, agentId]);
 
   const toggleStatus = useCallback(async (): Promise<Agent | null> => {
-    if (!agent) return null;
-    const newStatus = agent.status === 'active' ? 'paused' : 'active';
-    return updateAgent({ status: newStatus as 'active' | 'paused' });
-  }, [agent, updateAgent]);
+    if (!authenticated || !agent || !agentId) return null;
+
+    try {
+      const token = await getAccessToken();
+      if (!token) throw new Error('No access token');
+
+      const action = agent.status === 'active' ? 'stop' : 'start';
+      const response = await fetch(`/api/agents/${agentId}/status`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to toggle agent status');
+      }
+
+      const data = await response.json();
+      const updatedAgent = { ...agent, status: data.status };
+      setAgent(updatedAgent);
+      return updatedAgent;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to toggle status');
+      return null;
+    }
+  }, [agent, agentId, authenticated, getAccessToken]);
+
+  // Execute one cycle manually
+  const executeOnce = useCallback(async () => {
+    if (!authenticated || !agentId) return null;
+
+    try {
+      const token = await getAccessToken();
+      if (!token) throw new Error('No access token');
+
+      const response = await fetch(`/api/agents/${agentId}/execute`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to execute agent');
+      }
+
+      return await response.json();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to execute');
+      return null;
+    }
+  }, [agentId, authenticated, getAccessToken]);
+
+  // Fetch agent status and logs
+  const fetchStatus = useCallback(async () => {
+    if (!authenticated || !agentId) return null;
+
+    try {
+      const token = await getAccessToken();
+      if (!token) throw new Error('No access token');
+
+      const response = await fetch(`/api/agents/${agentId}/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }, [agentId, authenticated, getAccessToken]);
 
   useEffect(() => {
     if (authenticated && agentId) {
@@ -307,5 +384,7 @@ export function useAgent(agentId: string | null) {
     fetchAgent,
     updateAgent,
     toggleStatus,
+    executeOnce,
+    fetchStatus,
   };
 }

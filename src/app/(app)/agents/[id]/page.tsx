@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { TVChart, TIMEFRAMES, PositionsTable, AgentSidebar, AgentRightPanel, AgentSwitcherBar, CreatePositionPanel, ChatPanel, AgentConfigPanel, PortfolioPanel, ToolsPanel, LogsPanel, NotificationsPanel, ApiKeysPanel, MarketSelector } from '@/components/trading';
 import { useMarketData, useAgent, useAgents } from '@/lib/hooks';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { AgentSetupChecklist, AgentSettingsPanel } from '@/components/agent';
+import { AgentSetupChecklist, AgentSettingsPanel, AgentControlsPanel } from '@/components/agent';
 import { ResizablePanel } from '@/components/ui/ResizablePanel';
 
 // Format large numbers
@@ -45,7 +45,7 @@ function AgentTradingPageContent() {
   const { agents: allAgents } = useAgents();
 
   // Fetch the current agent's data
-  const { agent, isLoading: agentLoading, error: agentError, toggleStatus } = useAgent(agentId);
+  const { agent, isLoading: agentLoading, error: agentError, toggleStatus, executeOnce, fetchStatus } = useAgent(agentId);
 
   const [activeTab, setActiveTab] = useState('tasks');
   const [selectedAgentId, setSelectedAgentId] = useState<string>(agentId || '');
@@ -330,6 +330,16 @@ function AgentTradingPageContent() {
               currentPrice={currentPrice}
               symbol={`${selectedCoin}/USD`}
               balance={0}
+            />
+          )}
+          {activeTab === 'controls' && (
+            <AgentControlsPanel
+              agentId={agent.id}
+              agentName={agent.name}
+              status={agent.status as 'active' | 'paused'}
+              onToggleStatus={toggleStatus}
+              onExecuteOnce={executeOnce}
+              fetchStatus={fetchStatus}
             />
           )}
           {activeTab === 'tasks' && (

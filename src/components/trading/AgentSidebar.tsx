@@ -8,6 +8,7 @@ interface AgentSidebarProps {
 
 const sidebarItems = [
   { id: 'create', icon: CreateIcon, label: 'Create Position', highlight: true },
+  { id: 'controls', icon: ControlsIcon, label: 'Agent Controls' },
   { id: 'chat', icon: ChatIcon, label: 'Chat' },
   { id: 'agent', icon: AgentIcon, label: 'Agent' },
   { id: 'tasks', icon: TasksIcon, label: 'Tasks' },
@@ -183,6 +184,15 @@ function ApiIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+    </svg>
+  );
+}
+
+function ControlsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none" />
     </svg>
   );
 }
