@@ -8,7 +8,7 @@
  */
 
 import { db } from '@/lib/db';
-import { agents, agentLogs, llmUsage } from '@/lib/db/schema';
+import { agents, agentLogs, llmUsage, balanceSnapshots, positions } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { decryptPrivateKey } from '@/lib/crypto';
 import { createServerTrader, hyperliquid } from '@/lib/hyperliquid';
@@ -266,6 +266,41 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
     await logAgentThinking(agentId,
       `Cycle complete. Made ${results.filter(r => r.executed).length} trades. LLM cost: $${totalLLMCost.toFixed(4)}`
     );
+
+    // Save balance snapshot for performance chart
+    try {
+      const [currentAgent] = await db
+        .select({ demoBalance: agents.demoBalance })
+        .from(agents)
+        .where(eq(agents.id, agentId))
+        .limit(1);
+
+      if (currentAgent) {
+        const currentBalance = parseFloat(currentAgent.demoBalance || '5000');
+
+        // Calculate unrealized P&L from open positions
+        const openPositions = await db
+          .select()
+          .from(positions)
+          .where(and(
+            eq(positions.agentId, agentId),
+            eq(positions.status, 'open')
+          ));
+
+        let unrealizedPnl = 0;
+        for (const pos of openPositions) {
+          unrealizedPnl += parseFloat(pos.unrealizedPnl || '0');
+        }
+
+        await db.insert(balanceSnapshots).values({
+          agentId,
+          balance: currentBalance.toString(),
+          unrealizedPnl: unrealizedPnl.toString(),
+        });
+      }
+    } catch (snapshotError) {
+      console.error('Failed to save balance snapshot:', snapshotError);
+    }
 
     return results;
   } catch (error) {

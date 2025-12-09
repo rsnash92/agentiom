@@ -446,3 +446,25 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+// ============================================
+// Balance Snapshots (for performance charts)
+// ============================================
+
+export const balanceSnapshots = pgTable('balance_snapshots', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  agentId: uuid('agent_id').references(() => agents.id, { onDelete: 'cascade' }).notNull(),
+  balance: numeric('balance').notNull(),
+  unrealizedPnl: numeric('unrealized_pnl').default('0'),
+  timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('snapshots_agent_idx').on(table.agentId),
+  index('snapshots_timestamp_idx').on(table.timestamp),
+]);
+
+export const balanceSnapshotsRelations = relations(balanceSnapshots, ({ one }) => ({
+  agent: one(agents, {
+    fields: [balanceSnapshots.agentId],
+    references: [agents.id],
+  }),
+}));

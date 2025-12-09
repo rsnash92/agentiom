@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrivyClient } from '@privy-io/server-auth';
 import { db } from '@/lib/db';
-import { agents, positions } from '@/lib/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { agents, positions, balanceSnapshots } from '@/lib/db/schema';
+import { eq, and, desc, asc } from 'drizzle-orm';
 
 const privy = new PrivyClient(
   process.env.NEXT_PUBLIC_PRIVY_APP_ID!,
@@ -66,45 +66,58 @@ export async function GET(
     const initialBalance = 5000;
     const currentBalance = parseFloat(agent.demoBalance || '5000');
 
-    // Get closed positions to build performance history
-    const closedPositions = await db
+    // Try to get balance snapshots first
+    const snapshots = await db
       .select()
-      .from(positions)
-      .where(and(
-        eq(positions.agentId, agentId),
-        eq(positions.status, 'closed')
-      ))
-      .orderBy(desc(positions.closedAt));
+      .from(balanceSnapshots)
+      .where(eq(balanceSnapshots.agentId, agentId))
+      .orderBy(asc(balanceSnapshots.timestamp))
+      .limit(500);
 
-    // Build performance data points from closed positions
-    const dataPoints: { timestamp: number; value: number }[] = [];
+    let dataPoints: { timestamp: number; value: number }[] = [];
 
-    // Start with initial balance at agent creation
-    const agentCreatedAt = new Date(agent.createdAt).getTime();
-    dataPoints.push({
-      timestamp: agentCreatedAt,
-      value: initialBalance,
-    });
+    if (snapshots.length > 0) {
+      // Use stored snapshots
+      dataPoints = snapshots.map(s => ({
+        timestamp: new Date(s.timestamp).getTime(),
+        value: parseFloat(s.balance) + parseFloat(s.unrealizedPnl || '0'),
+      }));
+    } else {
+      // Fall back to generating from positions
+      const closedPositions = await db
+        .select()
+        .from(positions)
+        .where(and(
+          eq(positions.agentId, agentId),
+          eq(positions.status, 'closed')
+        ))
+        .orderBy(desc(positions.closedAt));
 
-    // Add data points for each closed position
-    let runningBalance = initialBalance;
+      // Start with initial balance at agent creation
+      const agentCreatedAt = new Date(agent.createdAt).getTime();
+      dataPoints.push({
+        timestamp: agentCreatedAt,
+        value: initialBalance,
+      });
 
-    // Process positions in chronological order (oldest first)
-    const sortedPositions = [...closedPositions].reverse();
+      // Add data points for each closed position
+      let runningBalance = initialBalance;
+      const sortedPositions = [...closedPositions].reverse();
 
-    for (const pos of sortedPositions) {
-      const realizedPnl = parseFloat(pos.realizedPnl || '0');
-      runningBalance += realizedPnl;
+      for (const pos of sortedPositions) {
+        const realizedPnl = parseFloat(pos.realizedPnl || '0');
+        runningBalance += realizedPnl;
 
-      if (pos.closedAt) {
-        dataPoints.push({
-          timestamp: new Date(pos.closedAt).getTime(),
-          value: runningBalance,
-        });
+        if (pos.closedAt) {
+          dataPoints.push({
+            timestamp: new Date(pos.closedAt).getTime(),
+            value: runningBalance,
+          });
+        }
       }
     }
 
-    // Add current point
+    // Always add current point
     dataPoints.push({
       timestamp: Date.now(),
       value: currentBalance,
@@ -141,6 +154,53 @@ export async function GET(
     console.error('Failed to fetch performance:', error);
     return NextResponse.json(
       { error: 'Failed to fetch performance' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/agents/[id]/performance - Save a balance snapshot
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: agentId } = await params;
+    const ownership = await verifyAgentOwnership(request, agentId);
+
+    if (!ownership) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { agent } = ownership;
+    const currentBalance = parseFloat(agent.demoBalance || '5000');
+
+    // Calculate unrealized P&L from open positions
+    const openPositions = await db
+      .select()
+      .from(positions)
+      .where(and(
+        eq(positions.agentId, agentId),
+        eq(positions.status, 'open')
+      ));
+
+    let unrealizedPnl = 0;
+    for (const pos of openPositions) {
+      unrealizedPnl += parseFloat(pos.unrealizedPnl || '0');
+    }
+
+    // Save snapshot
+    await db.insert(balanceSnapshots).values({
+      agentId,
+      balance: currentBalance.toString(),
+      unrealizedPnl: unrealizedPnl.toString(),
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Failed to save snapshot:', error);
+    return NextResponse.json(
+      { error: 'Failed to save snapshot' },
       { status: 500 }
     );
   }
