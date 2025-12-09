@@ -118,46 +118,52 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data;
 
-    // Invite code is required for both demo and live trading
-    if (!data.inviteCode) {
-      return NextResponse.json(
-        { error: 'Invite code required' },
-        { status: 400 }
-      );
-    }
+    // Skip invite code validation in development
+    const isDev = process.env.NODE_ENV === 'development';
+    let validatedInviteCode: string | null = null;
 
-    const normalizedCode = data.inviteCode.trim().toUpperCase();
+    if (!isDev) {
+      // Invite code is required for both demo and live trading
+      if (!data.inviteCode) {
+        return NextResponse.json(
+          { error: 'Invite code required' },
+          { status: 400 }
+        );
+      }
 
-    // Validate and use invite code
-    const [inviteCode] = await db
-      .select()
-      .from(inviteCodes)
-      .where(
-        and(
-          eq(inviteCodes.code, normalizedCode),
-          eq(inviteCodes.isActive, true),
-          or(
-            isNull(inviteCodes.expiresAt),
-            gt(inviteCodes.expiresAt, new Date())
+      const normalizedCode = data.inviteCode.trim().toUpperCase();
+
+      // Validate and use invite code
+      const [inviteCode] = await db
+        .select()
+        .from(inviteCodes)
+        .where(
+          and(
+            eq(inviteCodes.code, normalizedCode),
+            eq(inviteCodes.isActive, true),
+            or(
+              isNull(inviteCodes.expiresAt),
+              gt(inviteCodes.expiresAt, new Date())
+            )
           )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!inviteCode || inviteCode.useCount >= inviteCode.maxUses) {
-      return NextResponse.json(
-        { error: 'Invalid or expired invite code' },
-        { status: 400 }
-      );
+      if (!inviteCode || inviteCode.useCount >= inviteCode.maxUses) {
+        return NextResponse.json(
+          { error: 'Invalid or expired invite code' },
+          { status: 400 }
+        );
+      }
+
+      // Increment use count
+      await db
+        .update(inviteCodes)
+        .set({ useCount: sql`${inviteCodes.useCount} + 1` })
+        .where(eq(inviteCodes.id, inviteCode.id));
+
+      validatedInviteCode = normalizedCode;
     }
-
-    // Increment use count
-    await db
-      .update(inviteCodes)
-      .set({ useCount: sql`${inviteCodes.useCount} + 1` })
-      .where(eq(inviteCodes.id, inviteCode.id));
-
-    const validatedInviteCode = normalizedCode;
 
     // Generate a real wallet for the agent
     const { address: agentWalletAddress, encryptedKey } = generateAgentWallet();
