@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { usePrivy } from '@privy-io/react-auth';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -13,52 +14,22 @@ import {
 
 interface AgentPerformanceChartProps {
   agentId: string;
-  initialBalance: number;
-  currentBalance: number;
+  initialBalance?: number;
+  currentBalance?: number;
 }
 
 interface DataPoint {
   timestamp: number;
   value: number;
-  label: string;
 }
 
-// Generate realistic performance data - mostly flat with small variations
-function generatePerformanceData(initialBalance: number, currentBalance: number): DataPoint[] {
-  const points: DataPoint[] = [];
-  const now = new Date();
-  const hoursBack = 8;
-  const numPoints = 100;
-
-  // For a new agent, the line should be mostly flat
-  const totalChange = currentBalance - initialBalance;
-
-  for (let i = 0; i <= numPoints; i++) {
-    const timestamp = new Date(now.getTime() - (hoursBack * 60 * 60 * 1000) + (i * (hoursBack * 60 * 60 * 1000) / numPoints));
-
-    // Progress from 0 to 1
-    const progress = i / numPoints;
-
-    // Base value progresses linearly from initial to current
-    const baseValue = initialBalance + (totalChange * progress);
-
-    // Add very small random noise (0.01% max) to make it look realistic
-    const noise = (Math.random() - 0.5) * initialBalance * 0.0002;
-
-    points.push({
-      timestamp: timestamp.getTime(),
-      value: baseValue + noise,
-      label: timestamp.toLocaleString('en-US', {
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }),
-    });
-  }
-
-  return points;
+interface PerformanceData {
+  initialBalance: number;
+  currentBalance: number;
+  unrealizedPnl: number;
+  totalPnl: number;
+  pnlPct: number;
+  dataPoints: DataPoint[];
 }
 
 // Custom tooltip component
@@ -82,25 +53,51 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
 
 export function AgentPerformanceChart({
   agentId,
-  initialBalance = 5000,
-  currentBalance = 5000
 }: AgentPerformanceChartProps) {
+  const { getAccessToken } = usePrivy();
   const [timeRange, setTimeRange] = useState<'ALL' | '72H'>('ALL');
   const [displayMode, setDisplayMode] = useState<'$' | '%'>('$');
+  const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Generate performance data
-  const performanceData = useMemo(() =>
-    generatePerformanceData(initialBalance, currentBalance),
-    [initialBalance, currentBalance]
-  );
+  // Fetch performance data
+  const fetchPerformance = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`/api/agents/${agentId}/performance`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-  // Calculate domain for Y axis - tight range around the data
-  const values = performanceData.map(d => d.value);
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
-  const range = maxValue - minValue || 10;
-  const yMin = Math.floor(minValue - range * 0.2);
-  const yMax = Math.ceil(maxValue + range * 0.2);
+      if (response.ok) {
+        const data = await response.json();
+        setPerformanceData(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch performance:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [agentId, getAccessToken]);
+
+  // Initial fetch and periodic refresh
+  useEffect(() => {
+    fetchPerformance();
+    const interval = setInterval(fetchPerformance, 30000); // Refresh every 30s
+    return () => clearInterval(interval);
+  }, [fetchPerformance]);
+
+  // Generate chart data points (fill in gaps for smooth line)
+  const chartData = performanceData?.dataPoints || [];
+
+  // Calculate domain for Y axis
+  const values = chartData.map(d => d.value);
+  const minValue = values.length > 0 ? Math.min(...values) : 4900;
+  const maxValue = values.length > 0 ? Math.max(...values) : 5100;
+  const range = maxValue - minValue || 100;
+  const yMin = Math.floor(minValue - range * 0.1);
+  const yMax = Math.ceil(maxValue + range * 0.1);
 
   // Format X axis ticks
   const formatXAxis = (timestamp: number) => {
@@ -119,8 +116,20 @@ export function AgentPerformanceChart({
     return `$${value.toLocaleString()}`;
   };
 
-  // Suppress unused warning
-  void agentId;
+  // Determine line color based on P&L
+  const pnlColor = (performanceData?.totalPnl || 0) >= 0 ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)';
+
+  // Suppress unused warnings
+  void timeRange;
+  void displayMode;
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -179,13 +188,13 @@ export function AgentPerformanceChart({
       <div className="flex-1 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
-            data={performanceData}
+            data={chartData}
             margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
           >
             <defs>
               <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="rgb(59, 130, 246)" stopOpacity={0} />
+                <stop offset="0%" stopColor={pnlColor} stopOpacity={0.3} />
+                <stop offset="100%" stopColor={pnlColor} stopOpacity={0} />
               </linearGradient>
             </defs>
 
@@ -220,7 +229,7 @@ export function AgentPerformanceChart({
             <Area
               type="monotone"
               dataKey="value"
-              stroke="rgb(59, 130, 246)"
+              stroke={pnlColor}
               strokeWidth={2}
               fill="url(#colorValue)"
               isAnimationActive={false}
