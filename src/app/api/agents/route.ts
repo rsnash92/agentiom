@@ -91,8 +91,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ agents: userAgents });
   } catch (error) {
     console.error('Failed to fetch agents:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to fetch agents' },
+      { error: 'Failed to fetch agents', details: errorMessage },
       { status: 500 }
     );
   }
