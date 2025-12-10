@@ -135,6 +135,7 @@ export const agents = pgTable('agents', {
     maxPositionSizePct: number;
     maxDrawdownPct: number;
     approvedPairs: string[];
+    confidenceThreshold?: number; // Min confidence (0-100) to execute trades
     tradingHours?: { start: number; end: number };
     // Position sizing strategy
     positionSizing?: {
@@ -159,6 +160,7 @@ export const agents = pgTable('agents', {
     maxPositionSizePct: 10,
     maxDrawdownPct: 20,
     approvedPairs: ['BTC', 'ETH'],
+    confidenceThreshold: 70,
     positionSizing: {
       strategy: 'fixed_fractional',
     },

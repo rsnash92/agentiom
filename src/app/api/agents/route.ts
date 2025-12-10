@@ -13,7 +13,7 @@ const privy = new PrivyClient(
 
 // Validation schema for creating an agent
 const createAgentSchema = z.object({
-  name: z.string().min(1).max(20),
+  name: z.string().min(1).max(30),
   prompt: z.string().max(1000).optional(), // Combined personality/strategy prompt
   personality: z.string().optional(), // Legacy support
   strategy: z.string().optional(), // Legacy support
@@ -27,6 +27,19 @@ const createAgentSchema = z.object({
     maxPositionSizePct: z.number().min(0).max(100).default(10),
     maxDrawdownPct: z.number().min(0).max(100).default(20),
     approvedPairs: z.array(z.string()).default(['BTC', 'ETH']),
+    confidenceThreshold: z.number().min(0).max(100).optional(),
+    positionSizing: z.object({
+      strategy: z.enum(['fixed_fractional', 'kelly_criterion', 'volatility_adjusted', 'risk_per_trade']),
+      maxRiskPerTrade: z.number().min(0).max(100).optional(),
+      kellyFraction: z.number().optional(),
+      volatilityMultiplier: z.number().optional(),
+    }).optional(),
+    trailingStop: z.object({
+      enabled: z.boolean(),
+      type: z.enum(['percentage', 'atr', 'step', 'breakeven']),
+      trailPercent: z.number().optional(),
+      atrMultiplier: z.number().optional(),
+    }).optional(),
   }).optional(),
   executionIntervalSeconds: z.number().min(60).max(86400).default(300),
 });
@@ -209,6 +222,16 @@ export async function POST(request: NextRequest) {
           maxPositionSizePct: data.policies?.maxPositionSizePct || 10,
           maxDrawdownPct: data.policies?.maxDrawdownPct || 20,
           approvedPairs,
+          confidenceThreshold: data.policies?.confidenceThreshold || 70,
+          positionSizing: data.policies?.positionSizing || {
+            strategy: 'fixed_fractional',
+            maxRiskPerTrade: 2,
+          },
+          trailingStop: data.policies?.trailingStop || {
+            enabled: true,
+            type: 'percentage',
+            trailPercent: 2,
+          },
         },
         executionInterval: data.executionIntervalSeconds || 300,
         status: 'paused',
