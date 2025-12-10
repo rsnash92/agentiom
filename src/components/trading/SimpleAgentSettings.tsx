@@ -167,7 +167,10 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
       // Load confidence threshold (default 50% for demo, 70% for live)
       setConfidenceThreshold(agent.policies?.confidenceThreshold ?? (agent.isDemo ? 50 : 70));
       // Load execution interval (default 300s = 5 minutes)
-      setExecutionInterval(agent.executionIntervalSeconds || 300);
+      // DB column is 'executionInterval', but type says 'executionIntervalSeconds'
+      const agentRecord = agent as unknown as { executionInterval?: number; executionIntervalSeconds?: number };
+      const interval = agentRecord.executionInterval || agentRecord.executionIntervalSeconds || 300;
+      setExecutionInterval(interval);
     }
   }, [agent]);
 

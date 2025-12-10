@@ -132,12 +132,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const data = validationResult.data;
+    const { executionIntervalSeconds, ...restData } = validationResult.data;
 
     const [updatedAgent] = await db
       .update(agents)
       .set({
-        ...data,
+        ...restData,
+        ...(executionIntervalSeconds !== undefined && { executionInterval: executionIntervalSeconds }),
         updatedAt: new Date(),
       })
       .where(eq(agents.id, id))
