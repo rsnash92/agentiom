@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useAgent } from '@/lib/hooks';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAgent, useAuth } from '@/lib/hooks';
 
 interface SimpleAgentSettingsProps {
   agentId: string;
@@ -92,10 +92,22 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
   const [strategyDropdownOpen, setStrategyDropdownOpen] = useState(false);
   const [stopLossDropdownOpen, setStopLossDropdownOpen] = useState(false);
   const [confidenceThreshold, setConfidenceThreshold] = useState(50);
+  const [executionInterval, setExecutionInterval] = useState(300); // Default 5 minutes
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executeResult, setExecuteResult] = useState<string | null>(null);
 
+  // LLM Usage stats
+  const [llmUsage, setLlmUsage] = useState<{
+    totalCalls: number;
+    totalCost: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    byTask: Array<{ taskType: string; calls: number; cost: number }>;
+  } | null>(null);
+  const [llmUsageLoading, setLlmUsageLoading] = useState(false);
+
+  const { getAccessToken } = useAuth();
   const strategyDropdownRef = useRef<HTMLDivElement>(null);
   const stopLossDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -113,6 +125,32 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Fetch LLM usage stats
+  const fetchLlmUsage = useCallback(async () => {
+    if (!agentId) return;
+    setLlmUsageLoading(true);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/agents/${agentId}/llm-usage?period=24h`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLlmUsage({
+          totalCalls: data.stats.totalCalls,
+          totalCost: data.stats.totalCost,
+          totalInputTokens: data.stats.totalInputTokens,
+          totalOutputTokens: data.stats.totalOutputTokens,
+          byTask: data.byTask,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch LLM usage:', error);
+    } finally {
+      setLlmUsageLoading(false);
+    }
+  }, [agentId, getAccessToken]);
+
   // Load agent data
   useEffect(() => {
     if (agent) {
@@ -128,8 +166,15 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
       }
       // Load confidence threshold (default 50% for demo, 70% for live)
       setConfidenceThreshold(agent.policies?.confidenceThreshold ?? (agent.isDemo ? 50 : 70));
+      // Load execution interval (default 300s = 5 minutes)
+      setExecutionInterval(agent.executionIntervalSeconds || 300);
     }
   }, [agent]);
+
+  // Fetch LLM usage on mount
+  useEffect(() => {
+    fetchLlmUsage();
+  }, [fetchLlmUsage]);
 
   const toggleSymbol = (symbol: string) => {
     setSelectedSymbols(prev =>
@@ -154,6 +199,7 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
     try {
       await updateAgent({
         personality: prompt,
+        executionIntervalSeconds: executionInterval,
         policies: {
           ...agent.policies,
           approvedPairs: selectedSymbols,
@@ -172,6 +218,21 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Calculate estimated daily cost based on interval
+  const estimatedDailyCost = () => {
+    // Rough estimate: ~$0.02 per execution (varies by model)
+    const avgCostPerExecution = 0.02;
+    const executionsPerDay = (24 * 60 * 60) / executionInterval;
+    return (executionsPerDay * avgCostPerExecution * selectedSymbols.length).toFixed(2);
+  };
+
+  // Format interval for display
+  const formatInterval = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    return `${(seconds / 3600).toFixed(1)}h`;
   };
 
   const handleRunNow = async () => {
@@ -452,6 +513,126 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
           </div>
         </div>
 
+        {/* Execution Interval Slider */}
+        <div>
+          <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block flex items-center gap-2">
+            Execution Interval
+            <span className="w-full h-px bg-border flex-1 ml-1" />
+          </label>
+
+          <div className="px-3 sm:px-4 py-3 sm:py-4 bg-background border border-blue-500/50 rounded-lg">
+            {/* Value display */}
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-lg sm:text-xl font-bold text-blue-400">
+                {formatInterval(executionInterval)}
+              </span>
+              <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium bg-blue-500/20 text-blue-400">
+                ~${estimatedDailyCost()}/day
+              </span>
+            </div>
+
+            {/* Slider */}
+            <input
+              type="range"
+              min="60"
+              max="3600"
+              step="60"
+              value={executionInterval}
+              onChange={(e) => setExecutionInterval(parseInt(e.target.value))}
+              className="w-full h-2 bg-background-secondary rounded-lg appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right,
+                  rgb(59, 130, 246) 0%,
+                  rgb(59, 130, 246) ${((executionInterval - 60) / (3600 - 60)) * 100}%,
+                  var(--color-background-secondary) ${((executionInterval - 60) / (3600 - 60)) * 100}%,
+                  var(--color-background-secondary) 100%)`
+              }}
+            />
+
+            {/* Labels */}
+            <div className="flex justify-between mt-2 text-[9px] sm:text-[10px] text-foreground-subtle">
+              <span>1 min</span>
+              <span>Higher Cost</span>
+              <span>Lower Cost</span>
+              <span>1 hour</span>
+            </div>
+
+            {/* Description */}
+            <p className="text-[10px] sm:text-xs text-foreground-muted mt-3 leading-relaxed">
+              How often the agent analyzes markets and makes decisions. Shorter intervals = more responsive but higher LLM costs.
+            </p>
+          </div>
+        </div>
+
+        {/* LLM Usage Stats */}
+        <div>
+          <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block flex items-center gap-2">
+            Today&apos;s AI Usage
+            <span className="w-full h-px bg-border flex-1 ml-1" />
+          </label>
+
+          <div className="px-3 sm:px-4 py-3 sm:py-4 bg-background border border-purple-500/50 rounded-lg">
+            {llmUsageLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : llmUsage ? (
+              <>
+                {/* Cost highlight */}
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-lg sm:text-xl font-bold text-purple-400">
+                    ${llmUsage.totalCost.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] sm:text-xs text-foreground-muted">
+                    {llmUsage.totalCalls} calls
+                  </span>
+                </div>
+
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-background-secondary rounded-lg p-2">
+                    <div className="text-foreground-subtle text-[10px] mb-0.5">Analyses</div>
+                    <div className="font-medium text-foreground">
+                      {llmUsage.byTask.find(t => t.taskType === 'analysis')?.calls || 0}
+                    </div>
+                  </div>
+                  <div className="bg-background-secondary rounded-lg p-2">
+                    <div className="text-foreground-subtle text-[10px] mb-0.5">Decisions</div>
+                    <div className="font-medium text-foreground">
+                      {llmUsage.byTask.find(t => t.taskType === 'decision')?.calls || 0}
+                    </div>
+                  </div>
+                  <div className="bg-background-secondary rounded-lg p-2">
+                    <div className="text-foreground-subtle text-[10px] mb-0.5">Input Tokens</div>
+                    <div className="font-medium text-foreground">
+                      {(llmUsage.totalInputTokens / 1000).toFixed(1)}k
+                    </div>
+                  </div>
+                  <div className="bg-background-secondary rounded-lg p-2">
+                    <div className="text-foreground-subtle text-[10px] mb-0.5">Output Tokens</div>
+                    <div className="font-medium text-foreground">
+                      {(llmUsage.totalOutputTokens / 1000).toFixed(1)}k
+                    </div>
+                  </div>
+                </div>
+
+                {/* Refresh button */}
+                <button
+                  onClick={fetchLlmUsage}
+                  className="mt-3 w-full py-1.5 text-[10px] sm:text-xs text-purple-400 hover:text-purple-300 flex items-center justify-center gap-1"
+                >
+                  <RefreshIcon className="w-3 h-3" />
+                  Refresh
+                </button>
+              </>
+            ) : (
+              <div className="text-center text-foreground-muted text-xs py-4">
+                No usage data yet
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Run Now Button */}
         <div className="pt-1 sm:pt-2">
           <button
@@ -528,6 +709,15 @@ function ChevronIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M23 4v6h-6M1 20v-6h6" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
     </svg>
   );
 }
