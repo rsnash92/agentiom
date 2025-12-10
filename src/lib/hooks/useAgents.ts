@@ -19,6 +19,7 @@ export interface Agent {
     maxPositionSizePct: number;
     maxDrawdownPct: number;
     approvedPairs: string[];
+    confidenceThreshold?: number;
     positionSizing?: {
       strategy: 'fixed_fractional' | 'kelly_criterion' | 'volatility_adjusted' | 'risk_per_trade';
       maxRiskPerTrade?: number;
@@ -83,6 +84,7 @@ export interface UpdateAgentInput {
     maxPositionSizePct?: number;
     maxDrawdownPct?: number;
     approvedPairs?: string[];
+    confidenceThreshold?: number;
     positionSizing?: {
       strategy?: 'fixed_fractional' | 'kelly_criterion' | 'volatility_adjusted' | 'risk_per_trade';
       maxRiskPerTrade?: number;

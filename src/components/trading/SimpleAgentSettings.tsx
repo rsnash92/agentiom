@@ -91,6 +91,7 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
   const [stopLossType, setStopLossType] = useState<StopLossType>('percentage');
   const [strategyDropdownOpen, setStrategyDropdownOpen] = useState(false);
   const [stopLossDropdownOpen, setStopLossDropdownOpen] = useState(false);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(50);
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executeResult, setExecuteResult] = useState<string | null>(null);
@@ -125,6 +126,8 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
       } else {
         setStopLossType('fixed');
       }
+      // Load confidence threshold (default 50% for demo, 70% for live)
+      setConfidenceThreshold(agent.policies?.confidenceThreshold ?? (agent.isDemo ? 50 : 70));
     }
   }, [agent]);
 
@@ -154,6 +157,7 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
         policies: {
           ...agent.policies,
           approvedPairs: selectedSymbols,
+          confidenceThreshold,
           positionSizing: {
             ...agent.policies?.positionSizing,
             strategy: positionSizing,
@@ -381,6 +385,71 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
               </div>
             </div>
           )}
+        </div>
+
+        {/* Confidence Threshold Slider */}
+        <div>
+          <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block flex items-center gap-2">
+            Minimum Confidence
+            <span className="w-full h-px bg-border flex-1 ml-1" />
+          </label>
+
+          <div className="px-3 sm:px-4 py-3 sm:py-4 bg-background border border-warning/50 rounded-lg">
+            {/* Value display */}
+            <div className="flex items-center justify-between mb-3">
+              <span className={`text-lg sm:text-xl font-bold ${
+                confidenceThreshold <= 50 ? 'text-error' :
+                confidenceThreshold <= 70 ? 'text-warning' :
+                'text-success'
+              }`}>
+                {confidenceThreshold}%
+              </span>
+              <span className={`text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium ${
+                confidenceThreshold <= 50 ? 'bg-error/20 text-error' :
+                confidenceThreshold <= 70 ? 'bg-warning/20 text-warning' :
+                'bg-success/20 text-success'
+              }`}>
+                {confidenceThreshold <= 50 ? 'Aggressive' :
+                 confidenceThreshold <= 70 ? 'Balanced' :
+                 'Conservative'}
+              </span>
+            </div>
+
+            {/* Slider */}
+            <input
+              type="range"
+              min="30"
+              max="90"
+              step="5"
+              value={confidenceThreshold}
+              onChange={(e) => setConfidenceThreshold(parseInt(e.target.value))}
+              className="w-full h-2 bg-background-secondary rounded-lg appearance-none cursor-pointer slider-thumb"
+              style={{
+                background: `linear-gradient(to right,
+                  var(--color-warning) 0%,
+                  var(--color-warning) ${((confidenceThreshold - 30) / 60) * 100}%,
+                  var(--color-background-secondary) ${((confidenceThreshold - 30) / 60) * 100}%,
+                  var(--color-background-secondary) 100%)`
+              }}
+            />
+
+            {/* Labels */}
+            <div className="flex justify-between mt-2 text-[9px] sm:text-[10px] text-foreground-subtle">
+              <span>30%</span>
+              <span>More Trades</span>
+              <span>Fewer Trades</span>
+              <span>90%</span>
+            </div>
+
+            {/* Description */}
+            <p className="text-[10px] sm:text-xs text-foreground-muted mt-3 leading-relaxed">
+              {confidenceThreshold <= 50
+                ? 'Agent will trade on weaker signals. More positions but lower conviction per trade.'
+                : confidenceThreshold <= 70
+                ? 'Balanced approach. Agent trades when reasonably confident in the setup.'
+                : 'Agent only trades on high-conviction setups. Fewer trades but higher quality.'}
+            </p>
+          </div>
         </div>
 
         {/* Run Now Button */}

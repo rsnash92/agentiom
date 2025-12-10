@@ -79,6 +79,8 @@ interface AgentConfig {
     maxPositionSizePct: number;
     maxDrawdownPct: number;
     approvedPairs: string[];
+    // Confidence threshold (user-configurable, 30-90%)
+    confidenceThreshold?: number;
     // Position sizing strategy (user-configurable)
     positionSizing?: {
       strategy: PositionSizingStrategy;
@@ -300,8 +302,8 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
       const decision = decisionResult.decision;
       await logAgentDecision(agentId, decision, market);
 
-      // 8. Execute if confidence is high enough (50% for demo, 70% for live)
-      const confidenceThreshold = config.isDemo ? 50 : 70;
+      // 8. Execute if confidence is high enough (user-configurable, defaults: 50% demo, 70% live)
+      const confidenceThreshold = config.policies.confidenceThreshold ?? (config.isDemo ? 50 : 70);
       if (decision.action !== 'hold' && decision.confidence >= confidenceThreshold) {
         let result: { success: boolean; orderId?: string; error?: string };
 
