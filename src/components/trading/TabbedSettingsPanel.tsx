@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAgent, useAuth } from '@/lib/hooks';
 
 interface TabbedSettingsPanelProps {
@@ -33,6 +33,14 @@ const STOP_LOSS_TYPES = [
   { id: 'step', name: 'Step', description: 'Step-based trailing' },
 ] as const;
 
+const LLM_MODELS = [
+  { id: 'deepseek-chat', name: 'DeepSeek', description: 'Fast & affordable' },
+  { id: 'gpt-4o', name: 'GPT-4o', description: 'OpenAI flagship' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'Fast & cheap' },
+  { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet', description: 'Anthropic balanced' },
+  { id: 'claude-opus-4-20250514', name: 'Claude Opus', description: 'Most capable' },
+] as const;
+
 type PositionSizingStrategy = typeof POSITION_SIZING_STRATEGIES[number]['id'];
 type StopLossType = typeof STOP_LOSS_TYPES[number]['id'];
 
@@ -57,6 +65,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
   const [prompt, setPrompt] = useState('');
   const [confidenceThreshold, setConfidenceThreshold] = useState(70);
   const [executionInterval, setExecutionInterval] = useState(300);
+  const [selectedModel, setSelectedModel] = useState('deepseek-chat');
 
   // LLM Usage
   const [llmUsage, setLlmUsage] = useState<{
@@ -84,8 +93,9 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
       setSelectedSymbols(agent.policies?.approvedPairs || ['BTC', 'ETH', 'SOL']);
       setPrompt(agent.personality || '');
       setConfidenceThreshold(agent.policies?.confidenceThreshold ?? 70);
-      const agentRecord = agent as unknown as { executionInterval?: number };
+      const agentRecord = agent as unknown as { executionInterval?: number; llmConfig?: { primaryModel?: string } };
       setExecutionInterval(agentRecord.executionInterval || 300);
+      setSelectedModel(agentRecord.llmConfig?.primaryModel || 'deepseek-chat');
     }
   }, [agent]);
 
@@ -120,6 +130,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
       await updateAgent({
         personality: prompt,
         executionIntervalSeconds: executionInterval,
+        model: selectedModel,
         policies: {
           ...agent.policies,
           approvedPairs: selectedSymbols,
@@ -175,7 +186,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
           onClick={() => setActiveTab('trade')}
           className={`flex-1 px-4 py-3 text-xs font-semibold transition-colors ${
             activeTab === 'trade'
-              ? 'text-primary border-b-2 border-primary bg-primary/5'
+              ? 'text-foreground border-b-2 border-foreground'
               : 'text-foreground-muted hover:text-foreground'
           }`}
         >
@@ -186,7 +197,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
           onClick={() => setActiveTab('agent')}
           className={`flex-1 px-4 py-3 text-xs font-semibold transition-colors ${
             activeTab === 'agent'
-              ? 'text-primary border-b-2 border-primary bg-primary/5'
+              ? 'text-foreground border-b-2 border-foreground'
               : 'text-foreground-muted hover:text-foreground'
           }`}
         >
@@ -209,7 +220,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                     onClick={() => setPositionSizing(strategy.id)}
                     className={`p-2.5 rounded-lg border text-left transition-all ${
                       positionSizing === strategy.id
-                        ? 'border-primary bg-primary/10'
+                        ? 'border-foreground bg-foreground/10'
                         : 'border-border hover:border-foreground-muted'
                     }`}
                   >
@@ -229,7 +240,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                     onClick={() => setStopLossType(type.id)}
                     className={`p-2 rounded-lg border text-center transition-all ${
                       stopLossType === type.id
-                        ? 'border-error bg-error/10'
+                        ? 'border-foreground bg-foreground/10'
                         : 'border-border hover:border-foreground-muted'
                     }`}
                   >
@@ -241,7 +252,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                 <div className="mt-3">
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-foreground-muted">Trail %</span>
-                    <span className="font-semibold text-error">{trailPercent}%</span>
+                    <span className="font-semibold">{trailPercent}%</span>
                   </div>
                   <input
                     type="range"
@@ -250,7 +261,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                     step="0.5"
                     value={trailPercent}
                     onChange={(e) => setTrailPercent(parseFloat(e.target.value))}
-                    className="w-full accent-error"
+                    className="w-full"
                   />
                 </div>
               )}
@@ -263,7 +274,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                 <div>
                   <div className="flex justify-between text-xs mb-2">
                     <span className="text-foreground-muted">Max Leverage</span>
-                    <span className="font-semibold text-primary">{maxLeverage}x</span>
+                    <span className="font-semibold">{maxLeverage}x</span>
                   </div>
                   <input
                     type="range"
@@ -271,7 +282,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                     max="50"
                     value={maxLeverage}
                     onChange={(e) => setMaxLeverage(parseInt(e.target.value))}
-                    className="w-full accent-primary"
+                    className="w-full"
                   />
                   <div className="flex justify-between text-[10px] text-foreground-subtle mt-1">
                     <span>1x</span>
@@ -284,7 +295,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                 <div>
                   <div className="flex justify-between text-xs mb-2">
                     <span className="text-foreground-muted">Max Position</span>
-                    <span className="font-semibold text-primary">${maxPositionSizeUsd.toLocaleString()}</span>
+                    <span className="font-semibold">${maxPositionSizeUsd.toLocaleString()}</span>
                   </div>
                   <input
                     type="number"
@@ -292,7 +303,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                     max="100000"
                     value={maxPositionSizeUsd}
                     onChange={(e) => setMaxPositionSizeUsd(parseInt(e.target.value) || 100)}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-foreground"
                   />
                 </div>
 
@@ -300,7 +311,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                 <div>
                   <div className="flex justify-between text-xs mb-2">
                     <span className="text-foreground-muted">Max Drawdown</span>
-                    <span className="font-semibold text-error">{maxDrawdownPct}%</span>
+                    <span className="font-semibold">{maxDrawdownPct}%</span>
                   </div>
                   <input
                     type="range"
@@ -308,7 +319,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                     max="50"
                     value={maxDrawdownPct}
                     onChange={(e) => setMaxDrawdownPct(parseInt(e.target.value))}
-                    className="w-full accent-error"
+                    className="w-full"
                   />
                   <div className="flex justify-between text-[10px] text-foreground-subtle mt-1">
                     <span>5%</span>
@@ -323,6 +334,26 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
         ) : (
           // AGENT SETTINGS TAB
           <>
+            {/* LLM Model Selection */}
+            <Section title="AI Model">
+              <div className="grid grid-cols-2 gap-2">
+                {LLM_MODELS.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => setSelectedModel(model.id)}
+                    className={`p-2.5 rounded-lg border text-left transition-all ${
+                      selectedModel === model.id
+                        ? 'border-foreground bg-foreground/10'
+                        : 'border-border hover:border-foreground-muted'
+                    }`}
+                  >
+                    <div className="text-xs font-semibold">{model.name}</div>
+                    <div className="text-[10px] text-foreground-muted">{model.description}</div>
+                  </button>
+                ))}
+              </div>
+            </Section>
+
             {/* Symbol Selection */}
             <Section title="Trading Pairs">
               <div className="flex flex-wrap gap-1.5">
@@ -330,10 +361,10 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                   <button
                     key={symbol.id}
                     onClick={() => toggleSymbol(symbol.id)}
-                    className={`px-2.5 py-1.5 rounded text-xs font-medium transition-all ${
+                    className={`px-2.5 py-1.5 rounded text-xs font-medium transition-all border ${
                       selectedSymbols.includes(symbol.id)
-                        ? 'bg-primary text-black'
-                        : 'bg-background text-foreground-muted hover:text-foreground'
+                        ? 'bg-foreground text-background border-foreground'
+                        : 'bg-background text-foreground-muted border-border hover:text-foreground hover:border-foreground-muted'
                     }`}
                   >
                     {symbol.id}
@@ -349,7 +380,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Describe your trading strategy..."
                 maxLength={1000}
-                className="w-full h-24 px-3 py-2.5 bg-background border border-border rounded-lg text-sm placeholder:text-foreground-subtle focus:outline-none focus:border-primary resize-none"
+                className="w-full h-24 px-3 py-2.5 bg-background border border-border rounded-lg text-sm placeholder:text-foreground-subtle focus:outline-none focus:border-foreground resize-none"
               />
               <div className="text-right text-[10px] text-foreground-subtle mt-1">
                 {prompt.length}/1000
@@ -359,16 +390,8 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
             {/* Confidence Threshold */}
             <Section title="Confidence Threshold">
               <div className="flex justify-between text-xs mb-2">
-                <span className={`font-semibold ${
-                  confidenceThreshold <= 50 ? 'text-error' :
-                  confidenceThreshold <= 70 ? 'text-warning' : 'text-success'
-                }`}>
-                  {confidenceThreshold}%
-                </span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                  confidenceThreshold <= 50 ? 'bg-error/20 text-error' :
-                  confidenceThreshold <= 70 ? 'bg-warning/20 text-warning' : 'bg-success/20 text-success'
-                }`}>
+                <span className="font-semibold">{confidenceThreshold}%</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-foreground/10 text-foreground-muted">
                   {confidenceThreshold <= 50 ? 'Aggressive' :
                    confidenceThreshold <= 70 ? 'Balanced' : 'Conservative'}
                 </span>
@@ -380,7 +403,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                 step="5"
                 value={confidenceThreshold}
                 onChange={(e) => setConfidenceThreshold(parseInt(e.target.value))}
-                className="w-full accent-warning"
+                className="w-full"
               />
               <p className="text-[10px] text-foreground-muted mt-2">
                 Minimum confidence required to execute trades
@@ -390,7 +413,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
             {/* Execution Interval */}
             <Section title="Execution Interval">
               <div className="flex justify-between text-xs mb-2">
-                <span className="font-semibold text-blue-400">{formatInterval(executionInterval)}</span>
+                <span className="font-semibold">{formatInterval(executionInterval)}</span>
                 <span className="text-[10px] text-foreground-muted">
                   ~${((24 * 60 * 60 / executionInterval) * 0.02 * selectedSymbols.length).toFixed(2)}/day
                 </span>
@@ -402,7 +425,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                 step="60"
                 value={executionInterval}
                 onChange={(e) => setExecutionInterval(parseInt(e.target.value))}
-                className="w-full accent-blue-400"
+                className="w-full"
               />
               <div className="flex justify-between text-[10px] text-foreground-subtle mt-1">
                 <span>1 min</span>
@@ -413,9 +436,9 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
 
             {/* LLM Usage */}
             <Section title="Today's AI Usage">
-              <div className="flex items-center justify-between px-3 py-2.5 bg-background border border-purple-500/30 rounded-lg">
+              <div className="flex items-center justify-between px-3 py-2.5 bg-background border border-border rounded-lg">
                 <div>
-                  <div className="text-lg font-bold text-purple-400">
+                  <div className="text-lg font-bold">
                     ${llmUsage?.totalCost.toFixed(2) || '0.00'}
                   </div>
                   <div className="text-[10px] text-foreground-muted">
@@ -424,9 +447,9 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
                 </div>
                 <button
                   onClick={fetchLlmUsage}
-                  className="p-2 hover:bg-purple-500/10 rounded-lg transition-colors"
+                  className="p-2 hover:bg-foreground/5 rounded-lg transition-colors"
                 >
-                  <RefreshIcon className="w-4 h-4 text-purple-400" />
+                  <RefreshIcon className="w-4 h-4 text-foreground-muted" />
                 </button>
               </div>
             </Section>
@@ -439,11 +462,11 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
         <button
           onClick={handleRunNow}
           disabled={isExecuting}
-          className="w-full py-2.5 bg-success/20 text-success font-semibold rounded-lg hover:bg-success/30 disabled:opacity-50 transition-colors text-sm flex items-center justify-center gap-2"
+          className="w-full py-2.5 bg-foreground/10 text-foreground font-semibold rounded-lg hover:bg-foreground/20 disabled:opacity-50 transition-colors text-sm flex items-center justify-center gap-2"
         >
           {isExecuting ? (
             <>
-              <span className="w-4 h-4 border-2 border-success border-t-transparent rounded-full animate-spin" />
+              <span className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
               Analyzing...
             </>
           ) : (
@@ -456,7 +479,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
         <button
           onClick={handleSave}
           disabled={isSaving || selectedSymbols.length === 0}
-          className="w-full py-2.5 bg-primary text-black font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors text-sm"
+          className="w-full py-2.5 bg-foreground text-background font-semibold rounded-lg hover:bg-foreground/90 disabled:opacity-50 transition-colors text-sm"
         >
           {isSaving ? 'SAVING...' : 'SAVE SETTINGS'}
         </button>

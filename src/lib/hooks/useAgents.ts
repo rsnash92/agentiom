@@ -91,6 +91,7 @@ export interface UpdateAgentInput {
   name?: string;
   personality?: string;
   strategy?: string;
+  model?: string;
   policies?: {
     maxLeverage?: number;
     maxPositionSizeUsd?: number;

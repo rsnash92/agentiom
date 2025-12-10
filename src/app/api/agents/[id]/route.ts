@@ -15,12 +15,26 @@ const updateAgentSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   personality: z.string().min(1).optional(),
   strategy: z.string().min(1).optional(),
+  model: z.string().optional(),
   policies: z.object({
     maxLeverage: z.number().min(1).max(50),
     maxPositionSizeUsd: z.number().min(0),
     maxPositionSizePct: z.number().min(0).max(100),
     maxDrawdownPct: z.number().min(0).max(100),
     approvedPairs: z.array(z.string()),
+    confidenceThreshold: z.number().min(0).max(100).optional(),
+    positionSizing: z.object({
+      strategy: z.enum(['fixed_fractional', 'kelly_criterion', 'volatility_adjusted', 'risk_per_trade']),
+      maxRiskPerTrade: z.number().optional(),
+      kellyFraction: z.number().optional(),
+      volatilityMultiplier: z.number().optional(),
+    }).optional(),
+    trailingStop: z.object({
+      enabled: z.boolean(),
+      type: z.enum(['percentage', 'atr', 'step', 'breakeven']),
+      trailPercent: z.number().optional(),
+      atrMultiplier: z.number().optional(),
+    }).optional(),
   }).optional(),
   llmProvider: z.enum(['claude', 'openai', 'deepseek']).optional(),
   executionIntervalSeconds: z.number().min(60).max(86400).optional(),
@@ -132,13 +146,46 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const { executionIntervalSeconds, ...restData } = validationResult.data;
+    const { executionIntervalSeconds, model, ...restData } = validationResult.data;
+
+    // Build llmConfig update if model is provided
+    type LLMConfig = {
+      primaryModel: string;
+      simpleModel: string;
+      analysisModel: string;
+      autoSelect: boolean;
+      parameters: {
+        temperature: number;
+        topP: number;
+        frequencyPenalty: number;
+        presencePenalty: number;
+        maxTokens: number;
+      };
+    };
+    let llmConfigUpdate: LLMConfig | undefined = undefined;
+    if (model) {
+      const existingLlmConfig = existingAgent.llmConfig as LLMConfig | null;
+      llmConfigUpdate = {
+        primaryModel: model,
+        simpleModel: existingLlmConfig?.simpleModel || 'gpt-4o-mini',
+        analysisModel: model,
+        autoSelect: existingLlmConfig?.autoSelect ?? false,
+        parameters: existingLlmConfig?.parameters || {
+          temperature: 0.3,
+          topP: 0.9,
+          frequencyPenalty: 0,
+          presencePenalty: 0,
+          maxTokens: 4096,
+        },
+      };
+    }
 
     const [updatedAgent] = await db
       .update(agents)
       .set({
         ...restData,
         ...(executionIntervalSeconds !== undefined && { executionInterval: executionIntervalSeconds }),
+        ...(llmConfigUpdate && { llmConfig: llmConfigUpdate }),
         updatedAt: new Date(),
       })
       .where(eq(agents.id, id))
