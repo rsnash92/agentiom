@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { TerminalPanel, SimpleAgentSettings, AgentPerformanceChart, AgentInfoCard } from '@/components/trading';
+import { TerminalPanel, TabbedSettingsPanel, AgentPerformanceChart, AgentInfoCard } from '@/components/trading';
 import { useAgent, useAgents } from '@/lib/hooks';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AgentSetupChecklist } from '@/components/agent';
@@ -155,9 +155,9 @@ function AgentTradingPageContent() {
         )}
       </div>
 
-      {/* Right Panel - Simple Agent Settings (full height on desktop, auto on mobile) */}
+      {/* Right Panel - Tabbed Settings (Trade & Agent tabs) */}
       <div className="w-full lg:w-[320px] panel flex flex-col overflow-hidden">
-        <SimpleAgentSettings agentId={agent.id} />
+        <TabbedSettingsPanel agentId={agent.id} />
       </div>
     </div>
   );

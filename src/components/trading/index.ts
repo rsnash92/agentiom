@@ -20,6 +20,7 @@ export { ApiKeysPanel } from './ApiKeysPanel';
 export { MarketSelector } from './MarketSelector';
 export { TerminalPanel } from './TerminalPanel';
 export { SimpleAgentSettings } from './SimpleAgentSettings';
+export { TabbedSettingsPanel } from './TabbedSettingsPanel';
 export { AgentPerformanceChart } from './AgentPerformanceChart';
 export { AgentInfoCard } from './AgentInfoCard';
 export { AgentPerformanceStats } from './AgentPerformanceStats';
