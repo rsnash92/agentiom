@@ -51,6 +51,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<'trade' | 'agent'>('trade');
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [executeResult, setExecuteResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Trade Settings State
   const [positionSizing, setPositionSizing] = useState<PositionSizingStrategy>('fixed_fractional');
@@ -157,10 +158,20 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
 
   const handleRunNow = async () => {
     setIsExecuting(true);
+    setExecuteResult(null);
     try {
-      await executeOnce();
+      const result = await executeOnce();
+      if (result) {
+        setExecuteResult({ success: true, message: result.message || 'Analysis complete' });
+      } else {
+        setExecuteResult({ success: false, message: 'No result returned' });
+      }
+    } catch (error) {
+      setExecuteResult({ success: false, message: error instanceof Error ? error.message : 'Execution failed' });
     } finally {
       setIsExecuting(false);
+      // Clear result after 5 seconds
+      setTimeout(() => setExecuteResult(null), 5000);
     }
   };
 
@@ -459,14 +470,19 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
 
       {/* Footer Actions */}
       <div className="p-4 border-t border-border space-y-2">
+        {executeResult && (
+          <div className={`text-xs p-2 rounded-lg ${executeResult.success ? 'bg-success/10 text-success' : 'bg-error/10 text-error'}`}>
+            {executeResult.message}
+          </div>
+        )}
         <button
           onClick={handleRunNow}
           disabled={isExecuting}
-          className="w-full py-2.5 bg-foreground/10 text-foreground font-semibold rounded-lg hover:bg-foreground/20 disabled:opacity-50 transition-colors text-sm flex items-center justify-center gap-2"
+          className="w-full py-2.5 bg-success/20 text-success font-semibold rounded-lg hover:bg-success/30 disabled:opacity-50 transition-colors text-sm flex items-center justify-center gap-2"
         >
           {isExecuting ? (
             <>
-              <span className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+              <span className="w-4 h-4 border-2 border-success border-t-transparent rounded-full animate-spin" />
               Analyzing...
             </>
           ) : (
