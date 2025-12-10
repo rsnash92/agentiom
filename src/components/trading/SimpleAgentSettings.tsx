@@ -46,7 +46,41 @@ const POSITION_SIZING_STRATEGIES = [
   },
 ] as const;
 
+const STOP_LOSS_TYPES = [
+  {
+    id: 'fixed',
+    name: 'Fixed',
+    description: 'Set once at entry, doesn\'t move. Traditional stop-loss placement.',
+    tags: [{ label: 'Simple', color: 'success' }, { label: 'Static', color: 'foreground-muted' }],
+  },
+  {
+    id: 'percentage',
+    name: 'Trailing %',
+    description: 'Follows price by X%. Locks in profits as price moves favorably.',
+    tags: [{ label: 'Dynamic', color: 'primary' }, { label: 'Popular', color: 'success' }],
+  },
+  {
+    id: 'atr',
+    name: 'Trailing ATR',
+    description: 'Follows price by X multiplied by volatility (ATR). Adapts to market conditions.',
+    tags: [{ label: 'Adaptive', color: 'primary' }, { label: 'Pro', color: 'warning' }],
+  },
+  {
+    id: 'breakeven',
+    name: 'Breakeven',
+    description: 'Moves stop to entry price after X% profit. Eliminates downside risk.',
+    tags: [{ label: 'Protective', color: 'success' }, { label: 'Risk-Free', color: 'primary' }],
+  },
+  {
+    id: 'step',
+    name: 'Step',
+    description: 'Locks profit in increments. Moves stop up at each gain threshold.',
+    tags: [{ label: 'Advanced', color: 'warning' }, { label: 'Incremental', color: 'primary' }],
+  },
+] as const;
+
 type PositionSizingStrategy = typeof POSITION_SIZING_STRATEGIES[number]['id'];
+type StopLossType = typeof STOP_LOSS_TYPES[number]['id'];
 
 export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsProps) {
   const { agent, updateAgent, executeOnce } = useAgent(agentId);
@@ -54,18 +88,24 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>(['BTC', 'ETH', 'SOL']);
   const [prompt, setPrompt] = useState('');
   const [positionSizing, setPositionSizing] = useState<PositionSizingStrategy>('fixed_fractional');
+  const [stopLossType, setStopLossType] = useState<StopLossType>('percentage');
   const [strategyDropdownOpen, setStrategyDropdownOpen] = useState(false);
+  const [stopLossDropdownOpen, setStopLossDropdownOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executeResult, setExecuteResult] = useState<string | null>(null);
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const strategyDropdownRef = useRef<HTMLDivElement>(null);
+  const stopLossDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (strategyDropdownRef.current && !strategyDropdownRef.current.contains(event.target as Node)) {
         setStrategyDropdownOpen(false);
+      }
+      if (stopLossDropdownRef.current && !stopLossDropdownRef.current.contains(event.target as Node)) {
+        setStopLossDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -78,6 +118,13 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
       setSelectedSymbols(agent.policies?.approvedPairs || ['BTC', 'ETH', 'SOL']);
       setPrompt(agent.personality || '');
       setPositionSizing(agent.policies?.positionSizing?.strategy || 'fixed_fractional');
+      // Map trailing stop type, with 'fixed' as default if not set or disabled
+      const trailingStop = agent.policies?.trailingStop;
+      if (trailingStop?.enabled && trailingStop?.type) {
+        setStopLossType(trailingStop.type);
+      } else {
+        setStopLossType('fixed');
+      }
     }
   }, [agent]);
 
@@ -111,6 +158,11 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
             ...agent.policies?.positionSizing,
             strategy: positionSizing,
           },
+          trailingStop: {
+            ...agent.policies?.trailingStop,
+            enabled: stopLossType !== 'fixed',
+            type: stopLossType === 'fixed' ? 'percentage' : stopLossType,
+          },
         },
       });
     } finally {
@@ -136,6 +188,7 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
   };
 
   const selectedStrategy = POSITION_SIZING_STRATEGIES.find(s => s.id === positionSizing);
+  const selectedStopLoss = STOP_LOSS_TYPES.find(s => s.id === stopLossType);
 
   return (
     <div className="h-full flex flex-col">
@@ -153,7 +206,7 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
+      <div className="flex-1 overflow-auto p-3 sm:p-4 space-y-4 sm:space-y-5">
         {/* Symbol Selection */}
         <div>
           <div className="flex items-center justify-between mb-2 sm:mb-3">
@@ -192,7 +245,7 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Enter your trading strategy prompt..."
               maxLength={1000}
-              className="w-full h-24 sm:h-32 px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary resize-none text-xs sm:text-sm"
+              className="w-full h-20 sm:h-24 px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary resize-none text-xs sm:text-sm"
             />
             <span className="absolute bottom-2 right-2 text-[10px] sm:text-xs text-foreground-subtle">
               {prompt.length}/1000
@@ -200,32 +253,30 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
           </div>
         </div>
 
-        {/* Strategy Dropdown - Professional Style */}
-        <div ref={dropdownRef} className="relative">
+        {/* Position Sizing Strategy Dropdown */}
+        <div ref={strategyDropdownRef} className="relative">
           <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block flex items-center gap-2">
-            Strategy
+            Position Sizing
             <span className="w-full h-px bg-border flex-1 ml-1" />
           </label>
 
-          {/* Selected Strategy Button */}
           <button
-            onClick={() => setStrategyDropdownOpen(!strategyDropdownOpen)}
+            onClick={() => {
+              setStrategyDropdownOpen(!strategyDropdownOpen);
+              setStopLossDropdownOpen(false);
+            }}
             className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-primary rounded-lg text-foreground focus:outline-none text-xs sm:text-sm flex items-center justify-between"
           >
             <span>{selectedStrategy?.name}</span>
             <ChevronIcon className={`w-4 h-4 text-foreground-muted transition-transform ${strategyDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
-          {/* Dropdown Panel */}
           {strategyDropdownOpen && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl z-50 overflow-hidden">
-              {/* Strategies Header */}
               <div className="px-3 py-2 border-b border-border">
-                <span className="text-[10px] sm:text-xs text-foreground-muted uppercase tracking-wide">Strategies</span>
+                <span className="text-[10px] sm:text-xs text-foreground-muted uppercase tracking-wide">Position Sizing Strategies</span>
               </div>
-
-              {/* Strategy List */}
-              <div className="max-h-64 overflow-y-auto">
+              <div className="max-h-52 overflow-y-auto">
                 {POSITION_SIZING_STRATEGIES.map((strategy) => (
                   <button
                     key={strategy.id}
@@ -233,11 +284,11 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
                       setPositionSizing(strategy.id);
                       setStrategyDropdownOpen(false);
                     }}
-                    className={`w-full px-3 py-3 text-left hover:bg-background/50 transition-colors ${
+                    className={`w-full px-3 py-2.5 text-left hover:bg-background/50 transition-colors ${
                       positionSizing === strategy.id ? 'bg-primary/10 border-l-2 border-l-primary' : ''
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-start justify-between gap-2 mb-0.5">
                       <span className={`text-xs sm:text-sm font-medium ${positionSizing === strategy.id ? 'text-primary' : 'text-foreground'}`}>
                         {strategy.name}
                       </span>
@@ -259,6 +310,71 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
                     </div>
                     <p className="text-[10px] sm:text-xs text-foreground-muted leading-relaxed">
                       {strategy.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Stop-Loss Type Dropdown */}
+        <div ref={stopLossDropdownRef} className="relative">
+          <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block flex items-center gap-2">
+            Stop-Loss Type
+            <span className="w-full h-px bg-border flex-1 ml-1" />
+          </label>
+
+          <button
+            onClick={() => {
+              setStopLossDropdownOpen(!stopLossDropdownOpen);
+              setStrategyDropdownOpen(false);
+            }}
+            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-error/50 rounded-lg text-foreground focus:outline-none text-xs sm:text-sm flex items-center justify-between"
+          >
+            <span>{selectedStopLoss?.name}</span>
+            <ChevronIcon className={`w-4 h-4 text-foreground-muted transition-transform ${stopLossDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {stopLossDropdownOpen && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl z-50 overflow-hidden">
+              <div className="px-3 py-2 border-b border-border">
+                <span className="text-[10px] sm:text-xs text-foreground-muted uppercase tracking-wide">Stop-Loss Types</span>
+              </div>
+              <div className="max-h-52 overflow-y-auto">
+                {STOP_LOSS_TYPES.map((type) => (
+                  <button
+                    key={type.id}
+                    onClick={() => {
+                      setStopLossType(type.id);
+                      setStopLossDropdownOpen(false);
+                    }}
+                    className={`w-full px-3 py-2.5 text-left hover:bg-background/50 transition-colors ${
+                      stopLossType === type.id ? 'bg-error/10 border-l-2 border-l-error' : ''
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-0.5">
+                      <span className={`text-xs sm:text-sm font-medium ${stopLossType === type.id ? 'text-error' : 'text-foreground'}`}>
+                        {type.name}
+                      </span>
+                      <div className="flex gap-1 flex-shrink-0">
+                        {type.tags.map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium border ${
+                              tag.color === 'primary' ? 'text-primary border-primary/50' :
+                              tag.color === 'success' ? 'text-success border-success/50' :
+                              tag.color === 'warning' ? 'text-warning border-warning/50' :
+                              'text-foreground-muted border-border'
+                            }`}
+                          >
+                            {tag.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-[10px] sm:text-xs text-foreground-muted leading-relaxed">
+                      {type.description}
                     </p>
                   </button>
                 ))}
