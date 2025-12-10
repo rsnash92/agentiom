@@ -79,6 +79,23 @@ interface AgentConfig {
     maxPositionSizePct: number;
     maxDrawdownPct: number;
     approvedPairs: string[];
+    // Position sizing strategy (user-configurable)
+    positionSizing?: {
+      strategy: PositionSizingStrategy;
+      maxRiskPerTrade?: number;
+      kellyFraction?: number;
+      volatilityMultiplier?: number;
+    };
+    // Trailing stop configuration (user-configurable)
+    trailingStop?: {
+      enabled: boolean;
+      type: TrailingStopType;
+      trailPercent?: number;
+      atrMultiplier?: number;
+      stepPercent?: number;
+      stepGain?: number;
+      breakevenTriggerPercent?: number;
+    };
   };
   llmConfig: AgentLLMConfig;
   walletAddress: string;
@@ -248,8 +265,8 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
       `Analyzing ${marketData.length} markets: ${marketData.map(m => m.coin).join(', ')}`
     );
 
-    // 4b. Check and update trailing stops for open positions
-    await checkAndUpdateTrailingStops(agentId, accountState.positions, marketData);
+    // 4b. Check and update trailing stops for open positions (using agent's config)
+    await checkAndUpdateTrailingStops(agentId, config, accountState.positions, marketData);
 
     // 5. Build agent context for LLM
     const agentContext = buildAgentContext(config, accountState);
@@ -289,8 +306,8 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
         let result: { success: boolean; orderId?: string; error?: string };
 
         if (config.isDemo) {
-          // Demo mode: use simulator
-          result = await executeDemoDecision(agentId, config, decision, market);
+          // Demo mode: use simulator with position sizing
+          result = await executeDemoDecision(agentId, config, decision, market, accountState);
         } else {
           // Live mode: use real trader
           const privateKey = decryptPrivateKey(config.apiKeyEncrypted) as Hex;
@@ -719,12 +736,14 @@ async function trackLLMUsage(
 
 /**
  * Execute a demo trading decision using simulator
+ * Uses agent's configured position sizing strategy
  */
 async function executeDemoDecision(
   agentId: string,
   config: AgentConfig,
   decision: TradingDecision,
-  market: MarketData
+  market: MarketData,
+  accountState: { accountValue: number; freeCollateral: number }
 ): Promise<{ success: boolean; orderId?: string; error?: string }> {
   try {
     if (decision.action === 'close') {
@@ -737,10 +756,23 @@ async function executeDemoDecision(
     }
 
     if (decision.action === 'buy' || decision.action === 'sell') {
+      // Calculate optimal position size using agent's configured strategy
+      const positionSize = await calculateOptimalPositionSize(
+        agentId,
+        config,
+        accountState,
+        market,
+        decision
+      );
+
+      await logAgentThinking(agentId,
+        `[POSITION SIZING] ${positionSize.reasoning}`
+      );
+
       const result = await simulatePlaceOrder(agentId, {
         coin: decision.coin,
         side: decision.action,
-        size: decision.size || (config.policies.maxPositionSizeUsd / market.price / 2),
+        size: positionSize.sizeAsset, // Use calculated size instead of default
         orderType: 'market',
         leverage: decision.leverage || Math.min(config.policies.maxLeverage, 3),
         takeProfit: decision.takeProfit,
@@ -862,9 +894,11 @@ async function logAgentError(agentId: string, error: string) {
 
 /**
  * Check and update trailing stops for open positions
+ * Uses agent's configured trailing stop strategy from policies
  */
 async function checkAndUpdateTrailingStops(
   agentId: string,
+  config: AgentConfig,
   openPositions: Array<{
     coin: string;
     side: 'long' | 'short';
@@ -876,6 +910,11 @@ async function checkAndUpdateTrailingStops(
   }>,
   marketData: MarketData[]
 ): Promise<void> {
+  // Check if trailing stops are enabled for this agent
+  const trailingStopConfig = config.policies.trailingStop;
+  if (!trailingStopConfig?.enabled) {
+    return; // Trailing stops disabled, skip
+  }
   for (const position of openPositions) {
     const market = marketData.find(m => m.coin === position.coin);
     if (!market) continue;
@@ -907,7 +946,7 @@ async function checkAndUpdateTrailingStops(
       position.entryPrice
     );
 
-    // Calculate new trailing stop
+    // Calculate new trailing stop using agent's configured strategy
     const trailingResult = calculateTrailingStop(
       {
         side: position.side,
@@ -919,7 +958,16 @@ async function checkAndUpdateTrailingStops(
         atr: market.technicalIndicators?.atr14 || undefined,
         unrealizedPnlPercent,
       },
-      { type: 'percentage', trailPercent: 2, lockProfitPercent: 5, lockProfitTrailPercent: 1 }
+      {
+        type: trailingStopConfig.type,
+        trailPercent: trailingStopConfig.trailPercent ?? 2,
+        atrMultiplier: trailingStopConfig.atrMultiplier ?? 2,
+        stepPercent: trailingStopConfig.stepPercent ?? 1,
+        stepGain: trailingStopConfig.stepGain ?? 2,
+        breakevenTriggerPercent: trailingStopConfig.breakevenTriggerPercent ?? 2,
+        lockProfitPercent: 5,
+        lockProfitTrailPercent: 1,
+      }
     );
 
     // Update position with new stop loss and water marks
@@ -976,7 +1024,11 @@ async function calculateOptimalPositionSize(
 
   const stats = calculateTradeStatistics(trades);
 
-  // Calculate position size
+  // Get position sizing config from agent policies (user-configurable)
+  const positionSizingConfig = config.policies.positionSizing;
+  const strategy = positionSizingConfig?.strategy || 'fixed_fractional';
+
+  // Calculate position size using agent's configured strategy
   const result = calculatePositionSize(
     {
       accountValue: accountState.accountValue,
@@ -994,9 +1046,11 @@ async function calculateOptimalPositionSize(
       maxPositionSizeUsd: config.policies.maxPositionSizeUsd,
     },
     {
-      strategy: config.isDemo ? 'fixed_fractional' : 'volatility_adjusted',
+      strategy, // Use agent's configured strategy
       maxAccountPercent: config.policies.maxPositionSizePct,
-      kellyFraction: 0.25,
+      maxRiskPerTrade: positionSizingConfig?.maxRiskPerTrade ?? 100,
+      kellyFraction: positionSizingConfig?.kellyFraction ?? 0.25,
+      volatilityMultiplier: positionSizingConfig?.volatilityMultiplier ?? 1.5,
     }
   );
 
