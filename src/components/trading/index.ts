@@ -22,3 +22,4 @@ export { TerminalPanel } from './TerminalPanel';
 export { SimpleAgentSettings } from './SimpleAgentSettings';
 export { AgentPerformanceChart } from './AgentPerformanceChart';
 export { AgentInfoCard } from './AgentInfoCard';
+export { AgentPerformanceStats } from './AgentPerformanceStats';

@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { AgentPerformanceStats } from './AgentPerformanceStats';
 
 interface TerminalPanelProps {
   agentId: string;
   agentName: string;
 }
 
-type TabType = 'orders' | 'chat' | 'positions';
+type TabType = 'orders' | 'chat' | 'positions' | 'stats';
 
 interface Order {
   id: string;
@@ -221,6 +222,7 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
     { id: 'orders' as const, label: 'ORDER HISTORY' },
     { id: 'chat' as const, label: 'MODEL CHAT' },
     { id: 'positions' as const, label: 'POSITIONS' },
+    { id: 'stats' as const, label: 'STATS' },
   ];
 
   return (
@@ -414,6 +416,13 @@ export function TerminalPanel({ agentId, agentName }: TerminalPanelProps) {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Stats Tab */}
+        {activeTab === 'stats' && (
+          <div className="p-3 sm:p-4 overflow-auto">
+            <AgentPerformanceStats agentId={agentId} compact />
           </div>
         )}
       </div>
