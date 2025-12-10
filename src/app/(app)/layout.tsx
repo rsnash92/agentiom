@@ -8,8 +8,8 @@ import { Logo } from '@/components/ui/Logo';
 import { ConnectButton } from '@/components/auth/ConnectButton';
 
 const navigation = [
-  { name: 'New Agent', href: '/agents/new' },
-  { name: 'Terminal', href: '/agents' },
+  { name: 'My Agents', href: '/agents' },
+  { name: 'Leaderboard', href: '/leaderboard' },
 ];
 
 export default function AppLayout({
