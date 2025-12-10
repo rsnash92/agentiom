@@ -93,6 +93,9 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
   const [stopLossDropdownOpen, setStopLossDropdownOpen] = useState(false);
   const [confidenceThreshold, setConfidenceThreshold] = useState(50);
   const [executionInterval, setExecutionInterval] = useState(300); // Default 5 minutes
+  const [maxLeverage, setMaxLeverage] = useState(10);
+  const [maxPositionSizeUsd, setMaxPositionSizeUsd] = useState(1000);
+  const [maxDrawdownPct, setMaxDrawdownPct] = useState(20);
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executeResult, setExecuteResult] = useState<string | null>(null);
@@ -171,6 +174,10 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
       const agentRecord = agent as unknown as { executionInterval?: number; executionIntervalSeconds?: number };
       const interval = agentRecord.executionInterval || agentRecord.executionIntervalSeconds || 300;
       setExecutionInterval(interval);
+      // Load risk management settings
+      setMaxLeverage(agent.policies?.maxLeverage ?? 10);
+      setMaxPositionSizeUsd(agent.policies?.maxPositionSizeUsd ?? 1000);
+      setMaxDrawdownPct(agent.policies?.maxDrawdownPct ?? 20);
     }
   }, [agent]);
 
@@ -207,6 +214,9 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
           ...agent.policies,
           approvedPairs: selectedSymbols,
           confidenceThreshold,
+          maxLeverage,
+          maxPositionSizeUsd,
+          maxDrawdownPct,
           positionSizing: {
             ...agent.policies?.positionSizing,
             strategy: positionSizing,
@@ -449,6 +459,92 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
               </div>
             </div>
           )}
+        </div>
+
+        {/* Risk Management Section */}
+        <div>
+          <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block flex items-center gap-2">
+            Risk Management
+            <span className="w-full h-px bg-border flex-1 ml-1" />
+          </label>
+
+          <div className="px-3 sm:px-4 py-3 sm:py-4 bg-background border border-error/30 rounded-lg space-y-4">
+            {/* Max Leverage */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] sm:text-xs text-foreground-muted">Max Leverage</span>
+                <span className="text-xs sm:text-sm font-bold text-primary">{maxLeverage}x</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="50"
+                value={maxLeverage}
+                onChange={(e) => setMaxLeverage(parseInt(e.target.value))}
+                className="w-full h-2 bg-background-secondary rounded-lg appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right,
+                    var(--color-primary) 0%,
+                    var(--color-primary) ${((maxLeverage - 1) / 49) * 100}%,
+                    var(--color-background-secondary) ${((maxLeverage - 1) / 49) * 100}%,
+                    var(--color-background-secondary) 100%)`
+                }}
+              />
+              <div className="flex justify-between mt-1 text-[9px] sm:text-[10px] text-foreground-subtle">
+                <span>1x</span>
+                <span>25x</span>
+                <span>50x</span>
+              </div>
+            </div>
+
+            {/* Max Position Size */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] sm:text-xs text-foreground-muted">Max Position Size</span>
+                <span className="text-xs sm:text-sm font-bold text-primary">${maxPositionSizeUsd.toLocaleString()}</span>
+              </div>
+              <input
+                type="number"
+                min="100"
+                max="100000"
+                step="100"
+                value={maxPositionSizeUsd}
+                onChange={(e) => setMaxPositionSizeUsd(parseInt(e.target.value) || 100)}
+                className="w-full px-3 py-2 bg-background-secondary border border-border rounded-lg text-xs sm:text-sm text-foreground focus:outline-none focus:border-primary"
+              />
+            </div>
+
+            {/* Max Drawdown */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] sm:text-xs text-foreground-muted">Max Drawdown</span>
+                <span className="text-xs sm:text-sm font-bold text-error">{maxDrawdownPct}%</span>
+              </div>
+              <input
+                type="range"
+                min="5"
+                max="50"
+                value={maxDrawdownPct}
+                onChange={(e) => setMaxDrawdownPct(parseInt(e.target.value))}
+                className="w-full h-2 bg-background-secondary rounded-lg appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right,
+                    var(--color-error) 0%,
+                    var(--color-error) ${((maxDrawdownPct - 5) / 45) * 100}%,
+                    var(--color-background-secondary) ${((maxDrawdownPct - 5) / 45) * 100}%,
+                    var(--color-background-secondary) 100%)`
+                }}
+              />
+              <div className="flex justify-between mt-1 text-[9px] sm:text-[10px] text-foreground-subtle">
+                <span>5%</span>
+                <span>25%</span>
+                <span>50%</span>
+              </div>
+              <p className="text-[10px] sm:text-xs text-foreground-muted mt-2">
+                Agent pauses if portfolio drops by this amount
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Confidence Threshold Slider */}
