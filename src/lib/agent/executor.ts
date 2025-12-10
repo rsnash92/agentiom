@@ -32,11 +32,20 @@ import {
   buildTradingDecisionPrompt,
   buildPositionManagementPrompt,
   parseJsonResponse,
-  validateTradingDecision,
+  validateTradingDecision as validateTradingDecisionPolicy,
   AgentContext,
   MarketContext as LLMMarketContext,
   PositionContext,
 } from '@/lib/llm/prompts';
+import {
+  validateTradingDecisionSchema,
+  validateMarketAnalysis,
+} from '@/lib/llm/schemas';
+import {
+  createAgentLogger,
+  agentMetrics,
+  timed,
+} from './logger';
 import type { Hex } from 'viem';
 
 // New modules
@@ -163,8 +172,13 @@ interface ExecutionResult {
 export async function executeAgentCycle(agentId: string): Promise<ExecutionResult[]> {
   const results: ExecutionResult[] = [];
   let totalLLMCost = 0;
+  const log = createAgentLogger(agentId);
+  const cycleNumber = agentMetrics.getMetrics().executionCycles + 1;
 
   try {
+    log.cycleStart(cycleNumber);
+    agentMetrics.incrementCycles();
+
     // 1. Get agent config
     const [agent] = await db
       .select()
@@ -173,7 +187,7 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
       .limit(1);
 
     if (!agent) {
-      console.log(`Agent ${agentId} not found or not active`);
+      log.warn('Agent not found or not active');
       return [];
     }
 
@@ -287,6 +301,11 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
           volume24h: market.volume24h,
         });
 
+        // Log regime with structured logging
+        if (market.regime) {
+          log.regimeDetected(market.coin, market.regime.regime, market.regime.confidence);
+        }
+
         marketData.push(market);
       }
     }
@@ -358,26 +377,33 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
           riskConfig
         );
 
-        // Log warnings
+        // Log warnings with structured logging
         for (const warning of riskCheck.warnings) {
+          log.riskWarning(warning, { symbol: market.coin, action: decision.action });
           await logAgentThinking(agentId, `⚠️ Risk warning: ${warning}`);
         }
 
         // Check if we need to emergency stop
         if (riskCheck.shouldStopAgent) {
-          await emergencyStopAgent(agentId, riskCheck.reasons.join('; '));
-          await logAgentError(agentId, `🚨 EMERGENCY STOP: ${riskCheck.reasons.join('; ')}`);
+          const reason = riskCheck.reasons.join('; ');
+          log.emergencyStop(reason);
+          agentMetrics.incrementEmergencyStop();
+          await emergencyStopAgent(agentId, reason);
+          await logAgentError(agentId, `🚨 EMERGENCY STOP: ${reason}`);
           return results; // Stop execution immediately
         }
 
         // Check if trade is blocked by risk limits
         if (!riskCheck.allowed) {
-          await logAgentThinking(agentId, `🚫 Trade blocked by risk limits: ${riskCheck.reasons.join('; ')}`);
+          const blockReason = riskCheck.reasons.join('; ');
+          log.decisionBlocked(market.coin, decision.action, blockReason);
+          agentMetrics.incrementRiskBlock();
+          await logAgentThinking(agentId, `🚫 Trade blocked by risk limits: ${blockReason}`);
           results.push({
             success: true,
             decision,
             executed: false,
-            error: `Risk blocked: ${riskCheck.reasons.join('; ')}`,
+            error: `Risk blocked: ${blockReason}`,
             llmCost: totalLLMCost,
           });
           continue; // Skip to next market
@@ -409,9 +435,17 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
           llmCost: totalLLMCost,
         });
 
+        // Track execution with structured logging and metrics
+        agentMetrics.incrementTrades(result.success);
+
         if (result.success) {
+          log.tradeExecuted(decision.coin, decision.action, decision.size || 0, {
+            success: true,
+            orderId: result.orderId,
+          });
           await logAgentExecution(agentId, decision, result);
         } else {
+          log.tradeError(decision.coin, decision.action, result.error || 'Unknown error');
           await logAgentError(agentId, `Execution failed: ${result.error}`);
         }
       } else {
@@ -424,8 +458,13 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
       }
     }
 
+    // Log cycle completion with structured logging
+    const cycleEndTime = Date.now();
+    const tradesExecuted = results.filter(r => r.executed).length;
+    log.cycleEnd(cycleNumber, { trades: tradesExecuted, llmCost: totalLLMCost }, cycleEndTime);
+
     await logAgentThinking(agentId,
-      `Cycle complete. Made ${results.filter(r => r.executed).length} trades. LLM cost: $${totalLLMCost.toFixed(4)}`
+      `Cycle complete. Made ${tradesExecuted} trades. LLM cost: $${totalLLMCost.toFixed(4)}`
     );
 
     // Save balance snapshot for performance chart
@@ -465,7 +504,10 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
 
     return results;
   } catch (error) {
-    console.error(`Agent ${agentId} execution error:`, error);
+    log.error('Agent execution error', {
+      cycle: cycleNumber,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     await logAgentError(agentId, error instanceof Error ? error.message : 'Unknown error');
     return [];
   }
@@ -547,7 +589,7 @@ async function buildAgentContext(
 }
 
 /**
- * Perform market analysis using LLM
+ * Perform market analysis using LLM with Zod validation
  */
 async function performMarketAnalysis(
   config: AgentConfig,
@@ -559,6 +601,10 @@ async function performMarketAnalysis(
   analysis: string;
   cost: number;
 }> {
+  const log = createAgentLogger(config.id);
+  const symbols = marketData.map(m => m.coin);
+  log.analysisStart(symbols);
+
   const llmMarkets: LLMMarketContext[] = marketData.map(m => ({
     coin: m.coin,
     currentPrice: m.price,
@@ -576,42 +622,44 @@ async function performMarketAnalysis(
     : config.llmConfig.analysisModel;
 
   try {
-    const response = await callLLM({
-      model: modelId,
-      messages: [
-        { role: 'user', content: prompt },
-      ],
-      parameters: config.llmConfig.parameters,
-    });
+    // Time the LLM call
+    const { result: response, durationMs } = await timed(() =>
+      callLLM({
+        model: modelId,
+        messages: [
+          { role: 'user', content: prompt },
+        ],
+        parameters: config.llmConfig.parameters,
+      })
+    );
 
-    // Track LLM usage
+    // Track LLM usage and metrics
     await trackLLMUsage(config.id, config.userId, response, 'analysis');
+    agentMetrics.recordLLMCall(response.cost, durationMs);
 
-    // Parse response
-    const parsed = parseJsonResponse<{
-      analysis: {
-        marketSentiment: string;
-        volatility: string;
-        keyObservations: string[];
-        opportunities: Array<{
-          coin: string;
-          direction: string;
-          confidence: number;
-          reasoning: string;
-        }>;
-      };
-    }>(response.content);
+    // Parse and validate response with Zod
+    const rawParsed = parseJsonResponse<unknown>(response.content);
+    const validation = validateMarketAnalysis(rawParsed, response.content);
 
-    if (parsed?.analysis) {
+    if (validation.success && validation.data) {
+      const analysis = validation.data.analysis;
+      log.analysisResult(analysis.marketSentiment, analysis.volatility, durationMs);
+
       return {
-        sentiment: parsed.analysis.marketSentiment,
-        volatility: parsed.analysis.volatility,
-        analysis: JSON.stringify(parsed.analysis),
+        sentiment: analysis.marketSentiment,
+        volatility: analysis.volatility,
+        analysis: JSON.stringify(analysis),
         cost: response.cost,
       };
     }
 
-    // Fallback if parsing fails
+    // Log validation failure
+    log.warn('Market analysis validation failed', {
+      error: validation.error,
+      latencyMs: durationMs,
+    });
+
+    // Fallback if validation fails
     return {
       sentiment: 'neutral',
       volatility: 'medium',
@@ -619,7 +667,9 @@ async function performMarketAnalysis(
       cost: response.cost,
     };
   } catch (error) {
-    console.error('Market analysis LLM error:', error);
+    log.error('Market analysis LLM error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return {
       sentiment: 'neutral',
       volatility: 'medium',
@@ -630,7 +680,7 @@ async function performMarketAnalysis(
 }
 
 /**
- * Generate trading decision using LLM
+ * Generate trading decision using LLM with Zod validation
  */
 async function generateLLMDecision(
   config: AgentConfig,
@@ -646,6 +696,8 @@ async function generateLLMDecision(
     leverage: number;
   }
 ): Promise<{ decision: TradingDecision; cost: number }> {
+  const log = createAgentLogger(config.id);
+
   const llmMarket: LLMMarketContext = {
     coin: market.coin,
     currentPrice: market.price,
@@ -668,85 +720,96 @@ async function generateLLMDecision(
     : config.llmConfig.primaryModel;
 
   try {
-    const response = await callLLM({
-      model: modelId,
-      messages: [
-        { role: 'user', content: prompt },
-      ],
-      parameters: config.llmConfig.parameters,
-    });
+    // Time the LLM call
+    const { result: response, durationMs } = await timed(() =>
+      callLLM({
+        model: modelId,
+        messages: [
+          { role: 'user', content: prompt },
+        ],
+        parameters: config.llmConfig.parameters,
+      })
+    );
 
-    // Track LLM usage
+    // Track LLM usage and metrics
     await trackLLMUsage(config.id, config.userId, response, 'decision');
+    agentMetrics.recordLLMCall(response.cost, durationMs);
 
-    // Parse response
-    const parsed = parseJsonResponse<{
-      decision: {
-        action: string;
-        coin: string;
-        size?: number;
-        leverage?: number;
-        orderType?: string;
-        limitPrice?: number;
-        stopLoss?: number;
-        takeProfit?: number;
-        confidence: number;
-        reasoning: string;
-        riskAssessment?: string;
-      };
-    }>(response.content);
+    // Parse and validate response with Zod
+    const rawParsed = parseJsonResponse<unknown>(response.content);
+    const validation = validateTradingDecisionSchema(rawParsed, response.content);
 
-    if (parsed?.decision) {
+    if (validation.success && validation.data) {
+      const parsedDecision = validation.data.decision;
+
       // Map LLM action to our action types
       let action: TradingDecision['action'] = 'hold';
-      if (parsed.decision.action === 'open_long') action = 'buy';
-      else if (parsed.decision.action === 'open_short') action = 'sell';
-      else if (parsed.decision.action === 'close_position') action = 'close';
-      else if (parsed.decision.action === 'reduce_position') action = 'close';
+      if (parsedDecision.action === 'open_long') action = 'buy';
+      else if (parsedDecision.action === 'open_short') action = 'sell';
+      else if (parsedDecision.action === 'close_position') action = 'close';
+      else if (parsedDecision.action === 'reduce_position') action = 'close';
 
       const decision: TradingDecision = {
         action,
-        coin: parsed.decision.coin || market.coin,
-        confidence: Math.round(parsed.decision.confidence * 100),
-        size: parsed.decision.size ? parsed.decision.size / market.price : undefined,
-        leverage: parsed.decision.leverage,
-        reasoning: parsed.decision.reasoning,
-        takeProfit: parsed.decision.takeProfit,
-        stopLoss: parsed.decision.stopLoss,
+        coin: parsedDecision.coin || market.coin,
+        confidence: Math.round(parsedDecision.confidence * 100),
+        size: parsedDecision.size ? parsedDecision.size / market.price : undefined,
+        leverage: parsedDecision.leverage,
+        reasoning: parsedDecision.reasoning,
+        takeProfit: parsedDecision.takeProfit,
+        stopLoss: parsedDecision.stopLoss,
       };
 
+      // Log the decision with structured logging
+      log.decisionReceived(
+        market.coin,
+        action,
+        decision.confidence,
+        durationMs
+      );
+
       // Validate decision against policies
-      const validation = validateTradingDecision(
+      const policyValidation = validateTradingDecisionPolicy(
         {
-          action: parsed.decision.action,
-          size: parsed.decision.size,
-          leverage: parsed.decision.leverage,
-          stopLoss: parsed.decision.stopLoss,
+          action: parsedDecision.action,
+          size: parsedDecision.size,
+          leverage: parsedDecision.leverage,
+          stopLoss: parsedDecision.stopLoss,
         },
         agentContext
       );
 
-      if (!validation.valid) {
-        console.log(`Decision validation failed: ${validation.errors.join(', ')}`);
+      if (!policyValidation.valid) {
+        log.decisionBlocked(market.coin, action, policyValidation.errors.join(', '));
         decision.action = 'hold';
-        decision.reasoning = `Policy violation: ${validation.errors.join(', ')}`;
+        decision.reasoning = `Policy violation: ${policyValidation.errors.join(', ')}`;
       }
 
       return { decision, cost: response.cost };
     }
 
-    // Fallback to hold if parsing fails
+    // Log schema validation failure
+    log.warn('Trading decision schema validation failed', {
+      symbol: market.coin,
+      error: validation.error,
+      latencyMs: durationMs,
+    });
+
+    // Fallback to hold if validation fails
     return {
       decision: {
         action: 'hold',
         coin: market.coin,
         confidence: 50,
-        reasoning: 'Failed to parse LLM response',
+        reasoning: `Schema validation failed: ${validation.error}`,
       },
       cost: response.cost,
     };
   } catch (error) {
-    console.error('Decision LLM error:', error);
+    log.error('Decision LLM error', {
+      symbol: market.coin,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     // Fall back to rule-based decision
     return {
       decision: await generateRuleBasedDecision(config, market, existingPosition),

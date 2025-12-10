@@ -95,3 +95,12 @@ export {
   type RegimeDetectionInput,
   type RegimeDetectionResult,
 } from './market-regime';
+
+// Structured logging
+export {
+  logger,
+  createAgentLogger,
+  agentMetrics,
+  timed,
+  createTimer,
+} from './logger';
