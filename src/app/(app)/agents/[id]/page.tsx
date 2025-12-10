@@ -128,7 +128,7 @@ function AgentTradingPageContent() {
           status={agent.status as 'active' | 'paused'}
           isDemo={agent.isDemo}
           onToggleStatus={toggleStatus}
-          otherAgents={allAgents.map(a => ({ id: a.id, name: a.name, status: a.status }))}
+          otherAgents={allAgents.map(a => ({ id: a.id, name: a.name, status: a.status, isDemo: a.isDemo, balance: parseFloat(a.demoBalance || '5000') }))}
           onSelectAgent={(id) => router.push(`/agents/${id}`)}
         />
 
