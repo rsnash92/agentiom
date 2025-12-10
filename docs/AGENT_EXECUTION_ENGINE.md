@@ -1,6 +1,6 @@
 # Agentiom Agent Execution Engine
 
-## Technical Documentation v1.0
+## Technical Documentation v1.1
 
 ---
 
@@ -149,6 +149,26 @@ stopAllSchedulers()
 - **Auto-Stop**: Stops scheduler if agent becomes inactive
 - **Concurrent Execution**: Multiple agents run independently
 - **Last Execution Tracking**: Updates `lastExecutionAt` timestamp
+
+### Demo vs Live Mode
+
+Both demo and live agents use the **exact same execution engine**. The only difference is trade execution:
+
+| Component | Demo Mode | Live Mode |
+|-----------|-----------|-----------|
+| Executor | `executeAgentCycle()` | `executeAgentCycle()` |
+| Position Sizing | `calculateOptimalPositionSize()` | `calculateOptimalPositionSize()` |
+| Trailing Stops | `checkAndUpdateTrailingStops()` | `checkAndUpdateTrailingStops()` |
+| LLM Decisions | Same prompts & models | Same prompts & models |
+| Technical Analysis | Same indicators | Same indicators |
+| **Trade Execution** | `simulatePlaceOrder()` | `trader.placeOrder()` (Hyperliquid API) |
+| **Account State** | `getDemoAccountState()` | `trader.getAccountState()` |
+| Confidence Threshold | 50% | 70% |
+
+This means:
+- Position sizing strategies work identically in demo and live
+- Trailing stop configurations work identically in demo and live
+- Demo mode is a true simulation of live behavior with real market prices
 
 ### Demo Simulator
 
@@ -701,7 +721,26 @@ await db.insert(llmUsage).values({
   maxPositionSizePct: 10,       // Max position as % of account
   maxDrawdownPct: 20,           // Stop trading if drawdown exceeds
   approvedPairs: ['BTC', 'ETH', 'SOL'],
-  tradingHours: { start: 0, end: 24 }  // Optional
+  tradingHours: { start: 0, end: 24 },  // Optional
+
+  // Position Sizing Strategy (NEW - user selectable in UI)
+  positionSizing: {
+    strategy: 'fixed_fractional',  // 'fixed_fractional' | 'kelly_criterion' | 'volatility_adjusted' | 'risk_per_trade'
+    maxRiskPerTrade: 100,          // For risk_per_trade strategy
+    kellyFraction: 0.25,           // For kelly_criterion (0.1-1.0)
+    volatilityMultiplier: 1.5      // For volatility_adjusted
+  },
+
+  // Trailing Stop Configuration (NEW - user selectable in UI)
+  trailingStop: {
+    enabled: true,
+    type: 'percentage',            // 'percentage' | 'atr' | 'step' | 'breakeven'
+    trailPercent: 2,               // For percentage type
+    atrMultiplier: 2,              // For atr type
+    stepPercent: 1,                // For step type (lock X% per step)
+    stepGain: 2,                   // For step type (trigger every X% gain)
+    breakevenTriggerPercent: 2     // For breakeven type
+  }
 }
 ```
 
@@ -762,21 +801,32 @@ const DEFAULT_CIRCUIT_CONFIG = {
 
 ## Future Optimizations
 
+### Completed (v1.1)
+
+#### ✅ 1. Position Sizing Strategy Selection (DONE)
+Users can now select from 4 strategies in Agent Settings:
+- **Fixed Percentage**: Risk a fixed % of account per trade (simple, predictable)
+- **Kelly Criterion**: Optimize position size based on historical win rate (growth-optimized)
+- **Volatility-Adjusted**: Smaller positions in volatile markets (adaptive)
+- **Fixed Risk**: Risk $X per trade regardless of setup (consistent risk)
+
+**UI Location**: Agent Settings → Position Sizing Strategy dropdown
+**API**: `PATCH /api/agents/[id]/trading-config` with `positionSizing` payload
+**Executor**: Reads `agent.policies.positionSizing.strategy` and applies in `calculateOptimalPositionSize()`
+
+#### ✅ 2. Trailing Stop Configuration (DONE)
+Users can now configure trailing stop behavior in Agent Settings:
+- **Fixed**: No trailing - stop stays where it was set
+- **Trailing %**: Follows price by X%, locks in profits dynamically
+- **Trailing ATR**: Follows price by ATR × multiplier (volatility-adaptive)
+- **Breakeven**: Moves stop to entry price after X% profit threshold
+- **Step**: Locks profit in increments (e.g., every 2% gain, lock 1%)
+
+**UI Location**: Agent Settings → Stop-Loss Type dropdown (with enable/disable toggle)
+**API**: `PATCH /api/agents/[id]/trading-config` with `trailingStop` payload
+**Executor**: Reads `agent.policies.trailingStop` and applies in `checkAndUpdateTrailingStops()`
+
 ### High Priority
-
-#### 1. Expose Position Sizing Strategy to Users
-Currently hardcoded based on demo/live mode. Should allow users to choose:
-- Fixed Fractional (simple)
-- Kelly Criterion (growth-optimized)
-- Volatility-Adjusted (adaptive)
-- Risk-Per-Trade (consistent risk)
-
-#### 2. Expose Trailing Stop Configuration
-Allow users to configure:
-- Trail type (percentage, ATR, step, breakeven)
-- Trail percentage
-- Profit lock threshold
-- Tighter trail after profit
 
 #### 3. Historical Trade Statistics Dashboard
 Display win rate, avg win/loss ratio, Sharpe ratio, etc. Used by Kelly Criterion but not shown to users.
@@ -851,4 +901,13 @@ Currently market orders only. Add:
 ---
 
 *Last Updated: December 2024*
-*Version: 1.0*
+*Version: 1.1*
+
+### Changelog
+
+**v1.1** (December 2024)
+- Added user-configurable Position Sizing Strategy dropdown (4 strategies)
+- Added user-configurable Stop-Loss Type dropdown (5 types + enable toggle)
+- Wired UI settings to executor - selections now affect actual trading behavior
+- Added Demo vs Live Mode comparison table
+- Both demo and live agents share the same execution engine
