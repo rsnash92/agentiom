@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { BuyCreditsModal } from '@/components/credits';
 
 interface AgentSetupChecklistProps {
   agentId: string;
@@ -36,6 +37,7 @@ export function AgentSetupChecklist({
   const [expandedSection, setExpandedSection] = useState<string | null>('credits');
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [showBuyCreditsModal, setShowBuyCreditsModal] = useState(false);
   const [requirements, setRequirements] = useState<ChecklistRequirements>({
     credits: { current: 0, required: 1000, met: false },
     wallet: {
@@ -83,16 +85,34 @@ export function AgentSetupChecklist({
         },
       }));
 
-      // TODO: Fetch credits from user account
-      // For now, simulate some credits
-      setRequirements(prev => ({
-        ...prev,
-        credits: {
-          ...prev.credits,
-          current: 100, // Placeholder
-          met: 100 >= prev.credits.required,
-        },
-      }));
+      // Fetch credits from user account
+      try {
+        const creditsRes = await fetch('/api/credits', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (creditsRes.ok) {
+          const creditsData = await creditsRes.json();
+          setRequirements(prev => ({
+            ...prev,
+            credits: {
+              ...prev.credits,
+              current: creditsData.credits || 0,
+              met: (creditsData.credits || 0) >= prev.credits.required,
+            },
+          }));
+        }
+      } catch (creditError) {
+        console.error('Failed to fetch credits:', creditError);
+        // Keep default credits value if fetch fails
+        setRequirements(prev => ({
+          ...prev,
+          credits: {
+            ...prev.credits,
+            current: 100,
+            met: 100 >= prev.credits.required,
+          },
+        }));
+      }
 
       setLastRefresh(new Date());
     } catch (error) {
@@ -206,7 +226,10 @@ export function AgentSetupChecklist({
                       Credits are used for AI processing during trading decisions.
                     </p>
                   </div>
-                  <button className="w-full py-2.5 bg-primary text-black rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setShowBuyCreditsModal(true)}
+                    className="w-full py-2.5 bg-primary text-black rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                  >
                     <CreditIcon className="w-4 h-4" />
                     Purchase Credits
                   </button>
@@ -441,6 +464,24 @@ export function AgentSetupChecklist({
           </p>
         </div>
       </div>
+
+      {/* Buy Credits Modal */}
+      <BuyCreditsModal
+        isOpen={showBuyCreditsModal}
+        onClose={() => setShowBuyCreditsModal(false)}
+        currentCredits={requirements.credits.current}
+        onPurchaseComplete={(newBalance) => {
+          setRequirements(prev => ({
+            ...prev,
+            credits: {
+              ...prev.credits,
+              current: newBalance,
+              met: newBalance >= prev.credits.required,
+            },
+          }));
+          setShowBuyCreditsModal(false);
+        }}
+      />
     </div>
   );
 }
