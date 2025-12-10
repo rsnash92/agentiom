@@ -1037,28 +1037,71 @@ Real-time view of AI usage costs:
 **UI Location**: Agent Settings → Today's AI Usage panel
 **API**: `GET /api/agents/[id]/llm-usage?period=24h`
 
+#### ✅ 7. Risk Management Module (v1.2)
+Comprehensive safety guardrails in `src/lib/agent/risk-management.ts`:
+
+**Decision Deduplication**
+- Prevents duplicate trades within cooldown period (default: 5 minutes)
+- In-memory cache per agent tracking recent decisions
+- Checks action + symbol combination
+
+**Max Concurrent Positions**
+- Limits total open positions (default: 5)
+- Correlated asset groups limit exposure to related assets (default: 3 per group)
+- Groups: BTC | ETH/SOL/AVAX/MATIC | DOGE/SHIB/PEPE | BNB | XRP/XLM
+
+**Max Drawdown Emergency Stop**
+- Tracks peak balance per agent
+- Auto-pauses agent when drawdown exceeds threshold (default: 20%)
+- Logs emergency stop with reason
+- Warning zone at 80% of max drawdown
+
+**Integration**
+```typescript
+// In executor.ts - before every trade
+const riskCheck = await performRiskChecks(
+  agentId, action, symbol, currentBalance, riskConfig
+);
+
+if (riskCheck.shouldStopAgent) {
+  await emergencyStopAgent(agentId, riskCheck.reasons.join('; '));
+  return; // Stop execution immediately
+}
+
+if (!riskCheck.allowed) {
+  // Log reason and skip trade
+  continue;
+}
+
+// After successful trade - record for deduplication
+recordDecision(agentId, action, symbol);
+```
+
+**Executor**: Integrated into `executeAgentCycle()` at step 8a
+**Module**: `src/lib/agent/risk-management.ts`
+
 ### Medium Priority
 
-#### 7. Multi-Timeframe Analysis
+#### 8. Multi-Timeframe Analysis
 Currently uses 1h candles only. Add:
 - 15m for entry timing
 - 4h for trend confirmation
 - 1D for major S/R levels
 
-#### 8. Sentiment Data Integration
+#### 9. Sentiment Data Integration
 Add external data sources:
 - Fear & Greed Index
 - Social sentiment (Twitter, Reddit)
 - Funding rate trends
 - Liquidation data
 
-#### 9. Portfolio-Level Risk Management
+#### 10. Portfolio-Level Risk Management
 Currently per-position. Add:
 - Total portfolio exposure limits
 - Correlation-aware sizing
 - Sector concentration limits
 
-#### 10. Backtesting Engine
+#### 11. Backtesting Engine
 Simulate agent performance on historical data:
 - Test strategy changes before deploying
 - Optimize parameters
@@ -1066,24 +1109,41 @@ Simulate agent performance on historical data:
 
 ### Lower Priority
 
-#### 11. Agent Evolution (Genetic Algorithms)
+#### 12. Agent Evolution (Genetic Algorithms)
 Use `agent_genomes` table for:
 - Mutation of successful strategies
 - Crossover between top performers
 - Tournament selection
 
-#### 12. Real-Time Execution
+#### 13. Real-Time Execution
 Currently interval-based. Add:
 - WebSocket price streaming
 - Event-triggered execution
 - Faster response to market moves
 
-#### 13. Order Type Expansion
+#### 14. Order Type Expansion
 Currently market orders only. Add:
 - Limit orders with patience
 - Stop-limit entries
 - Scaled entry/exit
 - TWAP for large positions
+
+#### 15. Market Regime Detection
+Classify market conditions before making decisions:
+- TRENDING_UP: Clear uptrend, buy dips
+- TRENDING_DOWN: Clear downtrend, sell rallies
+- RANGING: Sideways, mean reversion works
+- HIGH_VOLATILITY: Choppy, reduce size
+- LOW_VOLATILITY: Quiet, breakout possible
+
+This affects how the agent should trade (different strategies per regime).
+
+#### 16. Recent Trade History in Prompt
+Include recent trades for context to prevent revenge trading:
+- Last N trades with entry/exit prices
+- P&L results
+- Prevents overtrading same setup
+- LLM considers recent context when deciding
 
 ---
 
@@ -1099,6 +1159,7 @@ Currently market orders only. Add:
 | `src/lib/agent/resilience.ts` | Retry + circuit breaker |
 | `src/lib/agent/technical-analysis.ts` | Technical indicators |
 | `src/lib/agent/performance-stats.ts` | Performance metrics calculation |
+| `src/lib/agent/risk-management.ts` | Risk guardrails (dedup, limits, emergency stop) |
 | `src/lib/agent/index.ts` | Module exports |
 | `src/lib/llm/index.ts` | LLM provider integration |
 | `src/lib/llm/prompts.ts` | Trading prompt templates |
@@ -1135,6 +1196,12 @@ Currently market orders only. Add:
   - Today's AI usage: cost, calls, tokens
   - Breakdown by task type (analysis vs decision)
   - Manual refresh button
+- Added Risk Management module (`risk-management.ts`)
+  - Decision deduplication with 5-minute cooldown
+  - Max concurrent positions (default: 5)
+  - Correlated asset groups limit (default: 3 per group)
+  - Max drawdown emergency stop with auto-pause
+  - Integrated into executor pre-trade checks
 
 **v1.1** (December 2024)
 - Added user-configurable Position Sizing Strategy dropdown (4 strategies)

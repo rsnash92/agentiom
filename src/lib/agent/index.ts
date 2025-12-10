@@ -85,3 +85,13 @@ export {
   type ClosedTrade,
   type BalanceSnapshot,
 } from './performance-stats';
+
+// Market regime detection
+export {
+  detectMarketRegime,
+  formatRegimeForPrompt,
+  getRegimeAdjustments,
+  type MarketRegime,
+  type RegimeDetectionInput,
+  type RegimeDetectionResult,
+} from './market-regime';

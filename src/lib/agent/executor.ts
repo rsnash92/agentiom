@@ -69,6 +69,11 @@ import {
   RiskConfig,
   DEFAULT_RISK_CONFIG,
 } from './risk-management';
+import {
+  detectMarketRegime,
+  formatRegimeForPrompt,
+  type RegimeDetectionResult,
+} from './market-regime';
 import type { CandleData } from '@/lib/hyperliquid';
 
 // Types
@@ -128,6 +133,8 @@ interface MarketData {
   candles?: CandleData[];
   technicalIndicators?: ReturnType<typeof calculateIndicators>;
   supportResistance?: ReturnType<typeof calculateSupportResistance>;
+  // Market regime detection
+  regime?: RegimeDetectionResult;
 }
 
 interface TradingDecision {
@@ -272,19 +279,35 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
           console.log(`Could not fetch candles for ${coin}:`, candleError);
         }
 
+        // Detect market regime for this asset
+        market.regime = detectMarketRegime({
+          currentPrice: market.price,
+          priceChange24h: market.priceChange24h,
+          indicators: market.technicalIndicators,
+          volume24h: market.volume24h,
+        });
+
         marketData.push(market);
       }
     }
 
+    // Log market regimes detected
+    const regimeSummary = marketData
+      .filter(m => m.regime)
+      .map(m => `${m.coin}: ${m.regime!.regime}`)
+      .join(', ');
     await logAgentThinking(agentId,
       `Analyzing ${marketData.length} markets: ${marketData.map(m => m.coin).join(', ')}`
     );
+    if (regimeSummary) {
+      await logAgentThinking(agentId, `Market regimes: ${regimeSummary}`);
+    }
 
     // 4b. Check and update trailing stops for open positions (using agent's config)
     await checkAndUpdateTrailingStops(agentId, config, accountState.positions, marketData);
 
-    // 5. Build agent context for LLM
-    const agentContext = buildAgentContext(config, accountState);
+    // 5. Build agent context for LLM (includes recent trades from DB)
+    const agentContext = await buildAgentContext(config, accountState);
 
     // 6. Use LLM for market analysis
     const analysisResult = await performMarketAnalysis(
@@ -450,8 +473,9 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
 
 /**
  * Build agent context from config and account state
+ * Fetches recent trades from DB to include in LLM context
  */
-function buildAgentContext(
+async function buildAgentContext(
   config: AgentConfig,
   accountState: {
     accountValue: number;
@@ -466,7 +490,38 @@ function buildAgentContext(
       leverage: number;
     }>;
   }
-): AgentContext {
+): Promise<AgentContext> {
+  // Fetch recent closed trades (last 24 hours, max 10)
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const recentClosedTrades = await db
+    .select({
+      symbol: positions.symbol,
+      side: positions.side,
+      entryPrice: positions.entryPrice,
+      size: positions.size,
+      realizedPnl: positions.realizedPnl,
+      closedAt: positions.closedAt,
+    })
+    .from(positions)
+    .where(and(
+      eq(positions.agentId, config.id),
+      eq(positions.status, 'closed')
+    ))
+    .orderBy(desc(positions.closedAt))
+    .limit(10);
+
+  // Map to AgentContext format
+  const recentTrades = recentClosedTrades
+    .filter(t => t.closedAt && t.closedAt >= oneDayAgo)
+    .map(t => ({
+      coin: t.symbol,
+      side: t.side === 'long' ? 'buy' as const : 'sell' as const,
+      price: parseFloat(t.entryPrice),
+      size: parseFloat(t.size),
+      pnl: parseFloat(t.realizedPnl || '0'),
+      timestamp: t.closedAt?.getTime() || Date.now(),
+    }));
+
   return {
     name: config.name,
     strategy: config.strategy,
@@ -487,7 +542,7 @@ function buildAgentContext(
       unrealizedPnl: p.unrealizedPnl,
       leverage: p.leverage,
     })),
-    recentTrades: [], // Would need to fetch from DB
+    recentTrades,
   };
 }
 
@@ -600,7 +655,12 @@ async function generateLLMDecision(
     fundingRate: market.funding,
   };
 
-  const prompt = buildTradingDecisionPrompt(agentContext, llmMarket, analysisContext);
+  // Include market regime in prompt if available
+  const promptOptions = market.regime
+    ? { marketRegime: formatRegimeForPrompt(market.regime) }
+    : undefined;
+
+  const prompt = buildTradingDecisionPrompt(agentContext, llmMarket, analysisContext, promptOptions);
 
   // Select appropriate model
   const modelId = config.llmConfig.autoSelect

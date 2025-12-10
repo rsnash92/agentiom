@@ -130,8 +130,37 @@ Analyze the market conditions and respond with JSON:
 export function buildTradingDecisionPrompt(
   agent: AgentContext,
   market: MarketContext,
-  analysis: string
+  analysis: string,
+  options?: {
+    marketRegime?: string;
+  }
 ): string {
+  // Format recent trades for context (helps prevent revenge trading)
+  const recentTradesSection = agent.recentTrades.length > 0
+    ? `
+Recent Trades (last 24h):
+${agent.recentTrades.slice(0, 5).map(t => {
+  const side = t.side.toUpperCase();
+  const pnlStr = t.pnl !== undefined
+    ? ` → ${t.pnl >= 0 ? '+' : ''}$${t.pnl.toFixed(2)}`
+    : '';
+  return `- ${side} ${t.coin} @ $${t.price.toFixed(2)}${pnlStr}`;
+}).join('\n')}
+
+Consider this recent trading history when making decisions. Avoid:
+- Revenge trading after losses
+- Overtrading the same setup
+- Repeating recent mistakes`
+    : '';
+
+  // Market regime guidance
+  const regimeSection = options?.marketRegime
+    ? `
+Market Regime:
+${options.marketRegime}
+`
+    : '';
+
   return `${TRADING_SYSTEM_PROMPT}
 
 Agent: ${agent.name}
@@ -159,6 +188,7 @@ Market Data for ${market.coin}:
 - 24h Volume: $${formatNumber(market.volume24h)}
 ${market.fundingRate !== undefined ? `- Funding Rate: ${(market.fundingRate * 100).toFixed(4)}%` : ''}
 ${market.orderBook ? `- Bid: $${market.orderBook.bestBid.toFixed(2)}, Ask: $${market.orderBook.bestAsk.toFixed(2)}` : ''}
+${regimeSection}${recentTradesSection}
 
 Previous Analysis:
 ${analysis}
