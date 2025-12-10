@@ -72,10 +72,43 @@ export async function POST(request: NextRequest, context: RouteContext) {
       // Execute one cycle
       const results = await executeAgentCycle(id);
 
+      // Build informative message
+      const tradesExecuted = results.filter(r => r.executed).length;
+      const totalMarkets = results.length;
+      const decisions = results.map(r => ({
+        coin: r.decision.coin,
+        action: r.decision.action,
+        confidence: r.decision.confidence,
+        executed: r.executed,
+        reasoning: r.decision.reasoning,
+      }));
+
+      let message: string;
+      if (totalMarkets === 0) {
+        message = 'No markets analyzed - check approved pairs';
+      } else if (tradesExecuted > 0) {
+        message = `Executed ${tradesExecuted} trade(s) across ${totalMarkets} market(s)`;
+      } else {
+        // All decisions were "hold" or below confidence threshold
+        const holdCount = results.filter(r => r.decision.action === 'hold').length;
+        const lowConfCount = results.filter(r => r.decision.action !== 'hold' && !r.executed).length;
+
+        if (holdCount === totalMarkets) {
+          message = `Analyzed ${totalMarkets} market(s) - holding (no clear signals)`;
+        } else if (lowConfCount > 0) {
+          message = `Analyzed ${totalMarkets} market(s) - signals below confidence threshold`;
+        } else {
+          message = `Analyzed ${totalMarkets} market(s) - no trades`;
+        }
+      }
+
       return NextResponse.json({
         success: true,
         results,
-        message: `Executed cycle with ${results.length} decisions`,
+        decisions,
+        tradesExecuted,
+        totalMarkets,
+        message,
       });
     } finally {
       // Restore original status if it was paused

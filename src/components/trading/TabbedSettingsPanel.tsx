@@ -51,7 +51,16 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<'trade' | 'agent'>('trade');
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [executeResult, setExecuteResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [executeResult, setExecuteResult] = useState<{
+    success: boolean;
+    message: string;
+    decisions?: Array<{
+      coin: string;
+      action: string;
+      confidence: number;
+      reasoning: string;
+    }>;
+  } | null>(null);
 
   // Trade Settings State
   const [positionSizing, setPositionSizing] = useState<PositionSizingStrategy>('fixed_fractional');
@@ -162,7 +171,11 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
     try {
       const result = await executeOnce();
       if (result) {
-        setExecuteResult({ success: true, message: result.message || 'Analysis complete' });
+        setExecuteResult({
+          success: true,
+          message: result.message || 'Analysis complete',
+          decisions: result.decisions,
+        });
       } else {
         setExecuteResult({ success: false, message: 'No result returned' });
       }
@@ -170,8 +183,8 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
       setExecuteResult({ success: false, message: error instanceof Error ? error.message : 'Execution failed' });
     } finally {
       setIsExecuting(false);
-      // Clear result after 5 seconds
-      setTimeout(() => setExecuteResult(null), 5000);
+      // Clear result after 10 seconds (longer to read decisions)
+      setTimeout(() => setExecuteResult(null), 10000);
     }
   };
 
@@ -470,9 +483,44 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
 
       {/* Footer Actions */}
       <div className="p-4 border-t border-border space-y-2">
+        {/* Agent Status Indicator */}
+        {agent && (
+          <div className={`text-[10px] px-2 py-1.5 rounded-lg flex items-center justify-between ${
+            agent.status === 'active' ? 'bg-success/10 text-success' : 'bg-foreground/5 text-foreground-muted'
+          }`}>
+            <div className="flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${agent.status === 'active' ? 'bg-success animate-pulse' : 'bg-foreground-muted'}`} />
+              {agent.status === 'active' ? 'Running automatically' : 'Paused'}
+            </div>
+            {agent.status === 'active' && (
+              <span>every {formatInterval(executionInterval)}</span>
+            )}
+          </div>
+        )}
         {executeResult && (
-          <div className={`text-xs p-2 rounded-lg ${executeResult.success ? 'bg-success/10 text-success' : 'bg-error/10 text-error'}`}>
-            {executeResult.message}
+          <div className={`text-xs p-2 rounded-lg space-y-2 ${executeResult.success ? 'bg-success/10' : 'bg-error/10'}`}>
+            <div className={executeResult.success ? 'text-success font-medium' : 'text-error font-medium'}>
+              {executeResult.message}
+            </div>
+            {executeResult.decisions && executeResult.decisions.length > 0 && (
+              <div className="space-y-1.5 pt-1 border-t border-border/30">
+                {executeResult.decisions.map((d, i) => (
+                  <div key={i} className="text-foreground-muted">
+                    <span className={`font-semibold ${
+                      d.action === 'buy' ? 'text-success' :
+                      d.action === 'sell' ? 'text-error' :
+                      'text-foreground-muted'
+                    }`}>
+                      {d.coin}: {d.action.toUpperCase()}
+                    </span>
+                    <span className="text-[10px] ml-1">({d.confidence}%)</span>
+                    <div className="text-[10px] text-foreground-subtle truncate" title={d.reasoning}>
+                      {d.reasoning.substring(0, 60)}{d.reasoning.length > 60 ? '...' : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <button
@@ -488,7 +536,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
           ) : (
             <>
               <PlayIcon className="w-4 h-4" />
-              RUN NOW
+              RUN ONCE
             </>
           )}
         </button>
