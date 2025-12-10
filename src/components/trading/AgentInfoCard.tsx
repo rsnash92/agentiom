@@ -106,7 +106,7 @@ export function AgentInfoCard({
               {/* Agent name with status dot */}
               <div className="flex items-center gap-1.5">
                 <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                  agent.status === 'active' ? 'bg-success' : 'bg-foreground-subtle'
+                  agent.status === 'active' ? 'bg-success animate-pulse' : 'bg-foreground-subtle'
                 }`} />
                 <span className={`text-xs sm:text-sm font-medium ${isSelected ? 'text-primary' : 'text-foreground'}`}>
                   {agent.name}
@@ -127,19 +127,30 @@ export function AgentInfoCard({
 
               {/* Status badges */}
               <div className="flex items-center gap-1">
-                {/* Running/Paused status */}
+                {/* Running/Paused toggle button */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     if (isSelected) onToggleStatus?.();
                   }}
-                  className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium ${
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-colors ${
                     agent.status === 'active'
-                      ? 'bg-success/20 text-success'
-                      : 'bg-foreground-subtle/20 text-foreground-muted'
+                      ? 'bg-success/20 text-success hover:bg-error/20 hover:text-error'
+                      : 'bg-foreground-subtle/20 text-foreground-muted hover:bg-success/20 hover:text-success'
                   }`}
+                  title={agent.status === 'active' ? 'Click to pause' : 'Click to start'}
                 >
-                  {agent.status === 'active' ? 'RUNNING' : 'PAUSED'}
+                  {agent.status === 'active' ? (
+                    <>
+                      <PauseIcon className="w-2.5 h-2.5" />
+                      RUNNING
+                    </>
+                  ) : (
+                    <>
+                      <PlayIcon className="w-2.5 h-2.5" />
+                      PAUSED
+                    </>
+                  )}
                 </button>
 
                 {/* Demo/Live badge */}
@@ -181,6 +192,23 @@ function PlusIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+function PauseIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <rect x="6" y="4" width="4" height="16" />
+      <rect x="14" y="4" width="4" height="16" />
     </svg>
   );
 }

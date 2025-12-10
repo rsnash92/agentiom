@@ -45,8 +45,9 @@ type PositionSizingStrategy = typeof POSITION_SIZING_STRATEGIES[number]['id'];
 type StopLossType = typeof STOP_LOSS_TYPES[number]['id'];
 
 export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
-  const { agent, updateAgent, executeOnce } = useAgent(agentId);
+  const { agent, updateAgent, executeOnce, toggleStatus } = useAgent(agentId);
   const { getAccessToken } = useAuth();
+  const [isToggling, setIsToggling] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'trade' | 'agent'>('trade');
   const [isSaving, setIsSaving] = useState(false);
@@ -165,7 +166,16 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
     }
   };
 
-  const handleRunNow = async () => {
+  const handleToggleStatus = async () => {
+    setIsToggling(true);
+    try {
+      await toggleStatus();
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+  const handleRunOnce = async () => {
     setIsExecuting(true);
     setExecuteResult(null);
     try {
@@ -483,20 +493,7 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
 
       {/* Footer Actions */}
       <div className="p-4 border-t border-border space-y-2">
-        {/* Agent Status Indicator */}
-        {agent && (
-          <div className={`text-[10px] px-2 py-1.5 rounded-lg flex items-center justify-between ${
-            agent.status === 'active' ? 'bg-success/10 text-success' : 'bg-foreground/5 text-foreground-muted'
-          }`}>
-            <div className="flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${agent.status === 'active' ? 'bg-success animate-pulse' : 'bg-foreground-muted'}`} />
-              {agent.status === 'active' ? 'Running automatically' : 'Paused'}
-            </div>
-            {agent.status === 'active' && (
-              <span>every {formatInterval(executionInterval)}</span>
-            )}
-          </div>
-        )}
+        {/* Execution Result */}
         {executeResult && (
           <div className={`text-xs p-2 rounded-lg space-y-2 ${executeResult.success ? 'bg-success/10' : 'bg-error/10'}`}>
             <div className={executeResult.success ? 'text-success font-medium' : 'text-error font-medium'}>
@@ -523,30 +520,63 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
             )}
           </div>
         )}
+
+        {/* Main RUN/PAUSE Toggle Button */}
         <button
-          onClick={handleRunNow}
-          disabled={isExecuting}
-          className="w-full py-2.5 bg-success/20 text-success font-semibold rounded-lg hover:bg-success/30 disabled:opacity-50 transition-colors text-sm flex items-center justify-center gap-2"
+          onClick={handleToggleStatus}
+          disabled={isToggling}
+          className={`w-full py-3 font-semibold rounded-lg transition-colors text-sm flex items-center justify-center gap-2 ${
+            agent?.status === 'active'
+              ? 'bg-error/20 text-error hover:bg-error/30'
+              : 'bg-success/20 text-success hover:bg-success/30'
+          } disabled:opacity-50`}
         >
-          {isExecuting ? (
+          {isToggling ? (
             <>
-              <span className="w-4 h-4 border-2 border-success border-t-transparent rounded-full animate-spin" />
-              Analyzing...
+              <span className={`w-4 h-4 border-2 ${agent?.status === 'active' ? 'border-error' : 'border-success'} border-t-transparent rounded-full animate-spin`} />
+              {agent?.status === 'active' ? 'Stopping...' : 'Starting...'}
+            </>
+          ) : agent?.status === 'active' ? (
+            <>
+              <PauseIcon className="w-4 h-4" />
+              PAUSE
             </>
           ) : (
             <>
               <PlayIcon className="w-4 h-4" />
-              RUN ONCE
+              RUN
             </>
           )}
         </button>
-        <button
-          onClick={handleSave}
-          disabled={isSaving || selectedSymbols.length === 0}
-          className="w-full py-2.5 bg-foreground text-background font-semibold rounded-lg hover:bg-foreground/90 disabled:opacity-50 transition-colors text-sm"
-        >
-          {isSaving ? 'SAVING...' : 'SAVE SETTINGS'}
-        </button>
+
+        {/* Secondary actions row */}
+        <div className="flex gap-2">
+          <button
+            onClick={handleRunOnce}
+            disabled={isExecuting || agent?.status === 'active'}
+            className="flex-1 py-2 text-xs text-foreground-muted hover:text-foreground border border-border rounded-lg hover:bg-foreground/5 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+            title={agent?.status === 'active' ? 'Pause agent first to run manually' : 'Run one analysis cycle'}
+          >
+            {isExecuting ? (
+              <>
+                <span className="w-3 h-3 border border-foreground-muted border-t-transparent rounded-full animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <RefreshIcon className="w-3 h-3" />
+                Run Once
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving || selectedSymbols.length === 0}
+            className="flex-1 py-2 text-xs bg-foreground text-background font-medium rounded-lg hover:bg-foreground/90 disabled:opacity-50 transition-colors"
+          >
+            {isSaving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -590,6 +620,15 @@ function PlayIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
       <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+function PauseIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <rect x="6" y="4" width="4" height="16" />
+      <rect x="14" y="4" width="4" height="16" />
     </svg>
   );
 }
