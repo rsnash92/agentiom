@@ -60,6 +60,13 @@ const TRAILING_STOP_TYPES = [
 type PositionSizingStrategy = typeof POSITION_SIZING_STRATEGIES[number]['id'];
 type TrailingStopType = typeof TRAILING_STOP_TYPES[number]['id'];
 
+interface RiskManagement {
+  maxLeverage: number;
+  maxPositionSizeUsd: number;
+  maxDrawdownPct: number;
+  confidenceThreshold: number;
+}
+
 interface TradingConfig {
   positionSizing: {
     strategy: PositionSizingStrategy;
@@ -77,6 +84,13 @@ interface TradingConfig {
     breakevenTriggerPercent?: number;
   };
 }
+
+const DEFAULT_RISK_MANAGEMENT: RiskManagement = {
+  maxLeverage: 10,
+  maxPositionSizeUsd: 1000,
+  maxDrawdownPct: 20,
+  confidenceThreshold: 70,
+};
 
 const DEFAULT_TRADING_CONFIG: TradingConfig = {
   positionSizing: { strategy: 'fixed_fractional' },
@@ -113,6 +127,8 @@ export function SettingsPanel({
   const [savingConfig, setSavingConfig] = useState(false);
   const [tradingConfig, setTradingConfig] = useState<TradingConfig>(DEFAULT_TRADING_CONFIG);
   const [savingTradingConfig, setSavingTradingConfig] = useState(false);
+  const [riskManagement, setRiskManagement] = useState<RiskManagement>(DEFAULT_RISK_MANAGEMENT);
+  const [savingRiskManagement, setSavingRiskManagement] = useState(false);
   const { getAccessToken } = useAuth();
 
   const isEligibleForCredits = cdxBalance >= 100000;
@@ -165,6 +181,36 @@ export function SettingsPanel({
     fetchTradingConfig();
   }, [agentId, getAccessToken]);
 
+  // Fetch risk management config when agentId changes
+  useEffect(() => {
+    if (!agentId) return;
+
+    async function fetchRiskManagement() {
+      try {
+        const token = await getAccessToken();
+        const res = await fetch(`/api/agents/${agentId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const policies = data.agent?.policies;
+          if (policies) {
+            setRiskManagement({
+              maxLeverage: policies.maxLeverage ?? DEFAULT_RISK_MANAGEMENT.maxLeverage,
+              maxPositionSizeUsd: policies.maxPositionSizeUsd ?? DEFAULT_RISK_MANAGEMENT.maxPositionSizeUsd,
+              maxDrawdownPct: policies.maxDrawdownPct ?? DEFAULT_RISK_MANAGEMENT.maxDrawdownPct,
+              confidenceThreshold: policies.confidenceThreshold ?? DEFAULT_RISK_MANAGEMENT.confidenceThreshold,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch risk management config:', error);
+      }
+    }
+
+    fetchRiskManagement();
+  }, [agentId, getAccessToken]);
+
   // Save LLM config
   const handleLLMConfigChange = async (newConfig: AgentLLMConfig) => {
     setLlmConfig(newConfig);
@@ -214,6 +260,36 @@ export function SettingsPanel({
       console.error('Failed to save trading config:', error);
     } finally {
       setSavingTradingConfig(false);
+    }
+  };
+
+  // Save risk management config
+  const handleRiskManagementChange = async (updates: Partial<RiskManagement>) => {
+    const newConfig = {
+      ...riskManagement,
+      ...updates,
+    };
+    setRiskManagement(newConfig);
+
+    if (!agentId) return;
+
+    setSavingRiskManagement(true);
+    try {
+      const token = await getAccessToken();
+      await fetch(`/api/agents/${agentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          policies: newConfig,
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to save risk management config:', error);
+    } finally {
+      setSavingRiskManagement(false);
     }
   };
 
@@ -437,6 +513,120 @@ export function SettingsPanel({
           expanded={expandedSection === 'thinking'}
           onToggle={() => toggleSection('thinking')}
         />
+
+        {/* Risk Management Section */}
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <button
+            onClick={() => toggleSection('risk')}
+            className="w-full flex items-center gap-3 p-4 hover:bg-background/50 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center flex-shrink-0">
+              <ShieldIcon className="w-5 h-5 text-warning" />
+            </div>
+            <div className="flex-1 text-left">
+              <h4 className="text-sm font-semibold">Risk Management</h4>
+              <p className="text-xs text-foreground-muted">Configure risk limits and safety constraints</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {savingRiskManagement && (
+                <span className="text-xs text-foreground-muted">Saving...</span>
+              )}
+              <ChevronIcon className={`w-5 h-5 text-foreground-muted transition-transform ${expandedSection === 'risk' ? 'rotate-180' : ''}`} />
+            </div>
+          </button>
+          {expandedSection === 'risk' && (
+            <div className="px-4 pb-4 border-t border-border">
+              <div className="pt-4 space-y-4">
+                {/* Max Leverage */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-foreground">Max Leverage</label>
+                    <span className="text-xs text-primary font-semibold">{riskManagement.maxLeverage}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    value={riskManagement.maxLeverage}
+                    onChange={(e) => handleRiskManagementChange({ maxLeverage: parseInt(e.target.value) })}
+                    disabled={savingRiskManagement}
+                    className="w-full h-2 bg-background rounded-lg appearance-none cursor-pointer accent-primary disabled:opacity-50"
+                  />
+                  <div className="flex justify-between text-xs text-foreground-subtle mt-1">
+                    <span>1x</span>
+                    <span>50x</span>
+                  </div>
+                </div>
+
+                {/* Max Position Size (USD) */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-foreground">Max Position Size</label>
+                    <span className="text-xs text-primary font-semibold">${riskManagement.maxPositionSizeUsd.toLocaleString()}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="100"
+                    max="100000"
+                    step="100"
+                    value={riskManagement.maxPositionSizeUsd}
+                    onChange={(e) => handleRiskManagementChange({ maxPositionSizeUsd: parseInt(e.target.value) })}
+                    disabled={savingRiskManagement}
+                    className="w-full h-2 bg-background rounded-lg appearance-none cursor-pointer accent-primary disabled:opacity-50"
+                  />
+                  <div className="flex justify-between text-xs text-foreground-subtle mt-1">
+                    <span>$100</span>
+                    <span>$100K</span>
+                  </div>
+                </div>
+
+                {/* Max Drawdown */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-foreground">Max Drawdown</label>
+                    <span className="text-xs text-error font-semibold">{riskManagement.maxDrawdownPct}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="50"
+                    value={riskManagement.maxDrawdownPct}
+                    onChange={(e) => handleRiskManagementChange({ maxDrawdownPct: parseInt(e.target.value) })}
+                    disabled={savingRiskManagement}
+                    className="w-full h-2 bg-background rounded-lg appearance-none cursor-pointer accent-error disabled:opacity-50"
+                  />
+                  <div className="flex justify-between text-xs text-foreground-subtle mt-1">
+                    <span>5%</span>
+                    <span>50%</span>
+                  </div>
+                  <p className="text-xs text-foreground-muted mt-1">Agent pauses if portfolio drops by this amount</p>
+                </div>
+
+                {/* Confidence Threshold */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-foreground">Confidence Threshold</label>
+                    <span className="text-xs text-success font-semibold">{riskManagement.confidenceThreshold}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="50"
+                    max="95"
+                    value={riskManagement.confidenceThreshold}
+                    onChange={(e) => handleRiskManagementChange({ confidenceThreshold: parseInt(e.target.value) })}
+                    disabled={savingRiskManagement}
+                    className="w-full h-2 bg-background rounded-lg appearance-none cursor-pointer accent-success disabled:opacity-50"
+                  />
+                  <div className="flex justify-between text-xs text-foreground-subtle mt-1">
+                    <span>50%</span>
+                    <span>95%</span>
+                  </div>
+                  <p className="text-xs text-foreground-muted mt-1">Minimum confidence required to execute trades</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Trading Config Section - Custom with dropdowns */}
         <div className="bg-card rounded-xl border border-border overflow-hidden">

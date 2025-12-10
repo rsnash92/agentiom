@@ -6,7 +6,6 @@ import { ModelSelector } from './ModelSelector';
 import { AgentLLMConfig, DEFAULT_LLM_CONFIG } from '@/lib/llm/types';
 import {
   Fieldset,
-  FormSelect,
   CollapsibleSection,
   SegmentedControl,
   Checkbox,
@@ -45,6 +44,24 @@ export interface AgentOptimizations {
   skipFinalChatFormatting: boolean;
   skipStepCompletionAssessment: boolean;
   enableModelAutoSelection: boolean;
+}
+
+// Risk Management types
+export interface RiskManagementConfig {
+  maxLeverage: number;
+  maxPositionSizeUsd: number;
+  maxDrawdownPct: number;
+  confidenceThreshold: number;
+  positionSizing: {
+    strategy: 'fixed_fractional' | 'kelly_criterion' | 'volatility_adjusted' | 'risk_per_trade';
+    maxRiskPerTrade: number;
+  };
+  trailingStop: {
+    enabled: boolean;
+    type: 'percentage' | 'atr' | 'step' | 'breakeven';
+    trailPercent: number;
+    atrMultiplier: number;
+  };
 }
 
 export interface AgentConfig {
@@ -111,11 +128,58 @@ const RISK_OPTIONS = [
   { value: 'aggressive', label: 'Aggressive' },
 ];
 
+const POSITION_SIZING_OPTIONS = [
+  { id: 'fixed_fractional', name: 'Fixed Fractional', desc: 'Fixed % of portfolio' },
+  { id: 'kelly_criterion', name: 'Kelly Criterion', desc: 'Optimal risk sizing' },
+  { id: 'volatility_adjusted', name: 'Volatility', desc: 'Adjust by market vol' },
+  { id: 'risk_per_trade', name: 'Risk Per Trade', desc: 'Fixed risk amount' },
+];
+
+const TRAILING_STOP_OPTIONS = [
+  { id: 'percentage', name: '%', desc: 'Percentage' },
+  { id: 'atr', name: 'ATR', desc: 'ATR Based' },
+  { id: 'step', name: 'Step', desc: 'Step Trail' },
+  { id: 'breakeven', name: 'B/E', desc: 'Breakeven' },
+];
+
+const DEFAULT_RISK_CONFIG: RiskManagementConfig = {
+  maxLeverage: 10,
+  maxPositionSizeUsd: 1000,
+  maxDrawdownPct: 20,
+  confidenceThreshold: 70,
+  positionSizing: {
+    strategy: 'fixed_fractional',
+    maxRiskPerTrade: 2,
+  },
+  trailingStop: {
+    enabled: true,
+    type: 'percentage',
+    trailPercent: 2,
+    atrMultiplier: 2,
+  },
+};
+
 interface AgentSettingsPanelProps {
   agentId: string;
   initialPersonality?: string;
   initialStrategy?: string;
   initialLlmConfig?: AgentLLMConfig;
+  initialPolicies?: {
+    maxLeverage?: number;
+    maxPositionSizeUsd?: number;
+    maxDrawdownPct?: number;
+    confidenceThreshold?: number;
+    positionSizing?: {
+      strategy?: 'fixed_fractional' | 'kelly_criterion' | 'volatility_adjusted' | 'risk_per_trade';
+      maxRiskPerTrade?: number;
+    };
+    trailingStop?: {
+      enabled?: boolean;
+      type?: 'percentage' | 'atr' | 'step' | 'breakeven';
+      trailPercent?: number;
+      atrMultiplier?: number;
+    };
+  };
 }
 
 export function AgentSettingsPanel({
@@ -123,6 +187,7 @@ export function AgentSettingsPanel({
   initialPersonality = '',
   initialStrategy = '',
   initialLlmConfig,
+  initialPolicies,
 }: AgentSettingsPanelProps) {
   const [config, setConfig] = useState<AgentConfig>({
     ...DEFAULT_CONFIG,
@@ -136,6 +201,22 @@ export function AgentSettingsPanel({
     },
   });
   const [llmConfig, setLlmConfig] = useState<AgentLLMConfig>(initialLlmConfig || DEFAULT_LLM_CONFIG);
+  const [riskConfig, setRiskConfig] = useState<RiskManagementConfig>({
+    maxLeverage: initialPolicies?.maxLeverage ?? DEFAULT_RISK_CONFIG.maxLeverage,
+    maxPositionSizeUsd: initialPolicies?.maxPositionSizeUsd ?? DEFAULT_RISK_CONFIG.maxPositionSizeUsd,
+    maxDrawdownPct: initialPolicies?.maxDrawdownPct ?? DEFAULT_RISK_CONFIG.maxDrawdownPct,
+    confidenceThreshold: initialPolicies?.confidenceThreshold ?? DEFAULT_RISK_CONFIG.confidenceThreshold,
+    positionSizing: {
+      strategy: initialPolicies?.positionSizing?.strategy ?? DEFAULT_RISK_CONFIG.positionSizing.strategy,
+      maxRiskPerTrade: initialPolicies?.positionSizing?.maxRiskPerTrade ?? DEFAULT_RISK_CONFIG.positionSizing.maxRiskPerTrade,
+    },
+    trailingStop: {
+      enabled: initialPolicies?.trailingStop?.enabled ?? DEFAULT_RISK_CONFIG.trailingStop.enabled,
+      type: initialPolicies?.trailingStop?.type ?? DEFAULT_RISK_CONFIG.trailingStop.type,
+      trailPercent: initialPolicies?.trailingStop?.trailPercent ?? DEFAULT_RISK_CONFIG.trailingStop.trailPercent,
+      atrMultiplier: initialPolicies?.trailingStop?.atrMultiplier ?? DEFAULT_RISK_CONFIG.trailingStop.atrMultiplier,
+    },
+  });
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
   const { getAccessToken } = useAuth();
@@ -147,6 +228,11 @@ export function AgentSettingsPanel({
 
   const updateLlmConfig = useCallback((newConfig: AgentLLMConfig) => {
     setLlmConfig(newConfig);
+    setHasChanges(true);
+  }, []);
+
+  const updateRiskConfig = useCallback((updates: Partial<RiskManagementConfig>) => {
+    setRiskConfig(prev => ({ ...prev, ...updates }));
     setHasChanges(true);
   }, []);
 
@@ -164,6 +250,14 @@ export function AgentSettingsPanel({
           personality: config.personality.description,
           strategy: config.trading.tradingStyle,
           llmConfig: llmConfig,
+          policies: {
+            maxLeverage: riskConfig.maxLeverage,
+            maxPositionSizeUsd: riskConfig.maxPositionSizeUsd,
+            maxDrawdownPct: riskConfig.maxDrawdownPct,
+            confidenceThreshold: riskConfig.confidenceThreshold,
+            positionSizing: riskConfig.positionSizing,
+            trailingStop: riskConfig.trailingStop,
+          },
         }),
       });
       setHasChanges(false);
@@ -229,6 +323,172 @@ export function AgentSettingsPanel({
                 <span>Creative</span>
               </div>
             </Fieldset>
+          </div>
+        </CollapsibleSection>
+
+        {/* Risk Management */}
+        <CollapsibleSection title="Risk Management" defaultOpen>
+          <div className="space-y-4">
+            <Fieldset label={`Max Leverage: ${riskConfig.maxLeverage}x`}>
+              <RangeSlider
+                value={riskConfig.maxLeverage}
+                onChange={(v) => updateRiskConfig({ maxLeverage: v })}
+                min={1}
+                max={50}
+              />
+              <div className="flex justify-between text-[10px] text-foreground-muted mt-2 px-1">
+                <span>1x</span>
+                <span>25x</span>
+                <span>50x</span>
+              </div>
+            </Fieldset>
+
+            <Fieldset label={`Max Position: $${riskConfig.maxPositionSizeUsd.toLocaleString()}`}>
+              <input
+                type="number"
+                value={riskConfig.maxPositionSizeUsd}
+                onChange={(e) => updateRiskConfig({ maxPositionSizeUsd: Number(e.target.value) })}
+                className="w-full px-3 py-2 bg-background-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+              />
+            </Fieldset>
+
+            <Fieldset label={`Max Drawdown: ${riskConfig.maxDrawdownPct}%`}>
+              <RangeSlider
+                value={riskConfig.maxDrawdownPct}
+                onChange={(v) => updateRiskConfig({ maxDrawdownPct: v })}
+                min={5}
+                max={50}
+              />
+              <div className="flex justify-between text-[10px] text-foreground-muted mt-2 px-1">
+                <span>5%</span>
+                <span>25%</span>
+                <span>50%</span>
+              </div>
+            </Fieldset>
+
+            <Fieldset label={`Confidence Threshold: ${riskConfig.confidenceThreshold}%`}>
+              <RangeSlider
+                value={riskConfig.confidenceThreshold}
+                onChange={(v) => updateRiskConfig({ confidenceThreshold: v })}
+                min={50}
+                max={95}
+              />
+              <div className="text-[10px] text-foreground-muted mt-2">
+                Minimum confidence required to execute trades
+              </div>
+            </Fieldset>
+          </div>
+        </CollapsibleSection>
+
+        {/* Position Sizing */}
+        <CollapsibleSection title="Position Sizing" defaultOpen={false}>
+          <div className="space-y-4">
+            <Fieldset label="Sizing Strategy">
+              <div className="grid grid-cols-2 gap-2">
+                {POSITION_SIZING_OPTIONS.map((strategy) => (
+                  <button
+                    key={strategy.id}
+                    onClick={() => updateRiskConfig({
+                      positionSizing: { ...riskConfig.positionSizing, strategy: strategy.id as RiskManagementConfig['positionSizing']['strategy'] }
+                    })}
+                    className={`p-2 rounded-lg border text-left transition-colors ${
+                      riskConfig.positionSizing.strategy === strategy.id
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border/60 bg-transparent hover:border-foreground-muted'
+                    }`}
+                  >
+                    <div className="text-xs font-medium">{strategy.name}</div>
+                    <div className="text-[10px] text-foreground-muted">{strategy.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </Fieldset>
+
+            <Fieldset label={`Max Risk Per Trade: ${riskConfig.positionSizing.maxRiskPerTrade}%`}>
+              <RangeSlider
+                value={riskConfig.positionSizing.maxRiskPerTrade}
+                onChange={(v) => updateRiskConfig({
+                  positionSizing: { ...riskConfig.positionSizing, maxRiskPerTrade: v }
+                })}
+                min={0.5}
+                max={10}
+                step={0.5}
+              />
+              <div className="text-[10px] text-foreground-muted mt-2">
+                Max portfolio % risked on a single trade
+              </div>
+            </Fieldset>
+          </div>
+        </CollapsibleSection>
+
+        {/* Trailing Stop */}
+        <CollapsibleSection title="Trailing Stop" defaultOpen={false}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 border border-border/60 rounded-lg">
+              <div>
+                <div className="text-xs font-medium">Enable Trailing Stop</div>
+                <div className="text-[10px] text-foreground-muted">Automatically trail stop loss</div>
+              </div>
+              <Toggle
+                checked={riskConfig.trailingStop.enabled}
+                onChange={(c) => updateRiskConfig({
+                  trailingStop: { ...riskConfig.trailingStop, enabled: c }
+                })}
+              />
+            </div>
+
+            {riskConfig.trailingStop.enabled && (
+              <>
+                <Fieldset label="Stop Type">
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {TRAILING_STOP_OPTIONS.map((type) => (
+                      <button
+                        key={type.id}
+                        onClick={() => updateRiskConfig({
+                          trailingStop: { ...riskConfig.trailingStop, type: type.id as RiskManagementConfig['trailingStop']['type'] }
+                        })}
+                        className={`p-2 rounded-lg border text-center transition-colors ${
+                          riskConfig.trailingStop.type === type.id
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border/60 bg-transparent hover:border-foreground-muted'
+                        }`}
+                      >
+                        <div className="text-xs font-medium">{type.name}</div>
+                        <div className="text-[9px] text-foreground-muted">{type.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </Fieldset>
+
+                {riskConfig.trailingStop.type === 'percentage' && (
+                  <Fieldset label={`Trail Distance: ${riskConfig.trailingStop.trailPercent}%`}>
+                    <RangeSlider
+                      value={riskConfig.trailingStop.trailPercent}
+                      onChange={(v) => updateRiskConfig({
+                        trailingStop: { ...riskConfig.trailingStop, trailPercent: v }
+                      })}
+                      min={0.5}
+                      max={10}
+                      step={0.5}
+                    />
+                  </Fieldset>
+                )}
+
+                {riskConfig.trailingStop.type === 'atr' && (
+                  <Fieldset label={`ATR Multiplier: ${riskConfig.trailingStop.atrMultiplier}x`}>
+                    <RangeSlider
+                      value={riskConfig.trailingStop.atrMultiplier}
+                      onChange={(v) => updateRiskConfig({
+                        trailingStop: { ...riskConfig.trailingStop, atrMultiplier: v }
+                      })}
+                      min={1}
+                      max={5}
+                      step={0.5}
+                    />
+                  </Fieldset>
+                )}
+              </>
+            )}
           </div>
         </CollapsibleSection>
 
