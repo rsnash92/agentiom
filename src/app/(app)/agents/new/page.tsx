@@ -60,10 +60,25 @@ function CreateAgentPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Advanced settings
+  // Advanced settings - Risk Management
   const [maxLeverage, setMaxLeverage] = useState(10);
   const [maxPositionSize, setMaxPositionSize] = useState(1000);
   const [maxDrawdown, setMaxDrawdown] = useState(20);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(70);
+
+  // Position Sizing
+  const [positionSizingStrategy, setPositionSizingStrategy] = useState<
+    'fixed_fractional' | 'kelly_criterion' | 'volatility_adjusted' | 'risk_per_trade'
+  >('fixed_fractional');
+  const [maxRiskPerTrade, setMaxRiskPerTrade] = useState(2);
+
+  // Trailing Stop
+  const [trailingStopEnabled, setTrailingStopEnabled] = useState(true);
+  const [trailingStopType, setTrailingStopType] = useState<
+    'percentage' | 'atr' | 'step' | 'breakeven'
+  >('percentage');
+  const [trailPercent, setTrailPercent] = useState(2);
+  const [atrMultiplier, setAtrMultiplier] = useState(2);
 
   // Suppress unused variable warning
   void isValidatingCode;
@@ -83,6 +98,26 @@ function CreateAgentPage() {
     // Set model if specified
     if (template.config.llmConfig?.primaryModel) {
       setSelectedModel(template.config.llmConfig.primaryModel);
+    }
+
+    // Set position sizing from template
+    if (template.config.policies.positionSizing) {
+      setPositionSizingStrategy(template.config.policies.positionSizing.strategy);
+      if (template.config.policies.positionSizing.maxRiskPerTrade) {
+        setMaxRiskPerTrade(template.config.policies.positionSizing.maxRiskPerTrade);
+      }
+    }
+
+    // Set trailing stop from template
+    if (template.config.policies.trailingStop) {
+      setTrailingStopEnabled(template.config.policies.trailingStop.enabled);
+      setTrailingStopType(template.config.policies.trailingStop.type);
+      if (template.config.policies.trailingStop.trailPercent) {
+        setTrailPercent(template.config.policies.trailingStop.trailPercent);
+      }
+      if (template.config.policies.trailingStop.atrMultiplier) {
+        setAtrMultiplier(template.config.policies.trailingStop.atrMultiplier);
+      }
     }
 
     setStep('configure');
@@ -174,6 +209,17 @@ function CreateAgentPage() {
           maxPositionSizePct: 10,
           maxDrawdownPct: maxDrawdown,
           approvedPairs: selectedSymbols,
+          confidenceThreshold,
+          positionSizing: {
+            strategy: positionSizingStrategy,
+            maxRiskPerTrade,
+          },
+          trailingStop: {
+            enabled: trailingStopEnabled,
+            type: trailingStopType,
+            trailPercent: trailingStopType === 'percentage' ? trailPercent : undefined,
+            atrMultiplier: trailingStopType === 'atr' ? atrMultiplier : undefined,
+          },
         },
       });
 
@@ -444,46 +490,200 @@ function CreateAgentPage() {
 
             {/* Advanced Settings */}
             {showAdvanced && (
-              <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 bg-background rounded-lg border border-border">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-                    <label className="text-xs sm:text-sm text-foreground-muted">Max Leverage</label>
-                    <span className="text-xs sm:text-sm font-mono text-foreground">{maxLeverage}x</span>
+              <div className="space-y-4 sm:space-y-5 p-3 sm:p-4 bg-background rounded-lg border border-border">
+                {/* Risk Management Section */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">Risk Management</h4>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                      <label className="text-xs sm:text-sm text-foreground-muted">Max Leverage</label>
+                      <span className="text-xs sm:text-sm font-mono text-foreground">{maxLeverage}x</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="50"
+                      value={maxLeverage}
+                      onChange={(e) => setMaxLeverage(Number(e.target.value))}
+                      className="w-full accent-primary"
+                    />
                   </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="50"
-                    value={maxLeverage}
-                    onChange={(e) => setMaxLeverage(Number(e.target.value))}
-                    className="w-full"
-                  />
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                      <label className="text-xs sm:text-sm text-foreground-muted">Max Position (USD)</label>
+                      <span className="text-xs sm:text-sm font-mono text-foreground">${maxPositionSize}</span>
+                    </div>
+                    <input
+                      type="number"
+                      value={maxPositionSize}
+                      onChange={(e) => setMaxPositionSize(Number(e.target.value))}
+                      className="w-full px-3 sm:px-4 py-2 bg-background-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                      <label className="text-xs sm:text-sm text-foreground-muted">Max Drawdown</label>
+                      <span className="text-xs sm:text-sm font-mono text-foreground">{maxDrawdown}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="5"
+                      max="50"
+                      value={maxDrawdown}
+                      onChange={(e) => setMaxDrawdown(Number(e.target.value))}
+                      className="w-full accent-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                      <label className="text-xs sm:text-sm text-foreground-muted">Confidence Threshold</label>
+                      <span className="text-xs sm:text-sm font-mono text-foreground">{confidenceThreshold}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="50"
+                      max="95"
+                      value={confidenceThreshold}
+                      onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
+                      className="w-full accent-primary"
+                    />
+                    <p className="text-[10px] text-foreground-subtle mt-1">Minimum confidence required to execute trades</p>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-                    <label className="text-xs sm:text-sm text-foreground-muted">Max Position (USD)</label>
-                    <span className="text-xs sm:text-sm font-mono text-foreground">${maxPositionSize}</span>
+
+                {/* Position Sizing Section */}
+                <div className="space-y-3 pt-3 border-t border-border/50">
+                  <h4 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">Position Sizing</h4>
+
+                  <div>
+                    <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 block">Sizing Strategy</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'fixed_fractional', name: 'Fixed Fractional', desc: 'Fixed % of portfolio' },
+                        { id: 'kelly_criterion', name: 'Kelly Criterion', desc: 'Optimal risk sizing' },
+                        { id: 'volatility_adjusted', name: 'Volatility', desc: 'Adjust by market vol' },
+                        { id: 'risk_per_trade', name: 'Risk Per Trade', desc: 'Fixed risk amount' },
+                      ].map((strategy) => (
+                        <button
+                          key={strategy.id}
+                          onClick={() => setPositionSizingStrategy(strategy.id as typeof positionSizingStrategy)}
+                          className={`p-2 rounded-lg border text-left transition-all ${
+                            positionSizingStrategy === strategy.id
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border/60 hover:border-foreground-muted'
+                          }`}
+                        >
+                          <div className="text-xs font-medium">{strategy.name}</div>
+                          <div className="text-[10px] text-foreground-subtle">{strategy.desc}</div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <input
-                    type="number"
-                    value={maxPositionSize}
-                    onChange={(e) => setMaxPositionSize(Number(e.target.value))}
-                    className="w-full px-3 sm:px-4 py-2 bg-background-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-                  />
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                      <label className="text-xs sm:text-sm text-foreground-muted">Max Risk Per Trade</label>
+                      <span className="text-xs sm:text-sm font-mono text-foreground">{maxRiskPerTrade}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="10"
+                      step="0.5"
+                      value={maxRiskPerTrade}
+                      onChange={(e) => setMaxRiskPerTrade(Number(e.target.value))}
+                      className="w-full accent-primary"
+                    />
+                    <p className="text-[10px] text-foreground-subtle mt-1">Max portfolio % risked on a single trade</p>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-                    <label className="text-xs sm:text-sm text-foreground-muted">Max Drawdown</label>
-                    <span className="text-xs sm:text-sm font-mono text-foreground">{maxDrawdown}%</span>
+
+                {/* Trailing Stop Section */}
+                <div className="space-y-3 pt-3 border-t border-border/50">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">Trailing Stop</h4>
+                    <button
+                      onClick={() => setTrailingStopEnabled(!trailingStopEnabled)}
+                      className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
+                        trailingStopEnabled ? 'bg-primary' : 'bg-foreground-muted/30'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                          trailingStopEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </button>
                   </div>
-                  <input
-                    type="range"
-                    min="5"
-                    max="50"
-                    value={maxDrawdown}
-                    onChange={(e) => setMaxDrawdown(Number(e.target.value))}
-                    className="w-full"
-                  />
+
+                  {trailingStopEnabled && (
+                    <>
+                      <div>
+                        <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 block">Stop Type</label>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {[
+                            { id: 'percentage', name: '%', desc: 'Percentage' },
+                            { id: 'atr', name: 'ATR', desc: 'ATR Based' },
+                            { id: 'step', name: 'Step', desc: 'Step Trail' },
+                            { id: 'breakeven', name: 'B/E', desc: 'Breakeven' },
+                          ].map((type) => (
+                            <button
+                              key={type.id}
+                              onClick={() => setTrailingStopType(type.id as typeof trailingStopType)}
+                              className={`p-2 rounded-lg border text-center transition-all ${
+                                trailingStopType === type.id
+                                  ? 'border-primary bg-primary/10'
+                                  : 'border-border/60 hover:border-foreground-muted'
+                              }`}
+                            >
+                              <div className="text-xs font-medium">{type.name}</div>
+                              <div className="text-[9px] text-foreground-subtle">{type.desc}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {trailingStopType === 'percentage' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                            <label className="text-xs sm:text-sm text-foreground-muted">Trail Distance</label>
+                            <span className="text-xs sm:text-sm font-mono text-foreground">{trailPercent}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0.5"
+                            max="10"
+                            step="0.5"
+                            value={trailPercent}
+                            onChange={(e) => setTrailPercent(Number(e.target.value))}
+                            className="w-full accent-primary"
+                          />
+                        </div>
+                      )}
+
+                      {trailingStopType === 'atr' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                            <label className="text-xs sm:text-sm text-foreground-muted">ATR Multiplier</label>
+                            <span className="text-xs sm:text-sm font-mono text-foreground">{atrMultiplier}x</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="1"
+                            max="5"
+                            step="0.5"
+                            value={atrMultiplier}
+                            onChange={(e) => setAtrMultiplier(Number(e.target.value))}
+                            className="w-full accent-primary"
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             )}
