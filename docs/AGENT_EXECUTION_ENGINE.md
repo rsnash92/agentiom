@@ -1,6 +1,6 @@
 # Agentiom Agent Execution Engine
 
-## Technical Documentation v1.1
+## Technical Documentation v1.2
 
 ---
 
@@ -17,6 +17,7 @@
    - [Trailing Stop-Loss](#trailing-stop-loss)
    - [Resilience (Retry & Circuit Breaker)](#resilience)
    - [Technical Analysis](#technical-analysis)
+   - [Performance Statistics](#performance-statistics)
 5. [Execution Flow](#execution-flow)
 6. [LLM Integration](#llm-integration)
 7. [Database Schema](#database-schema)
@@ -118,10 +119,18 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
 
 #### Confidence Thresholds
 
-| Mode | Threshold | Reasoning |
-|------|-----------|-----------|
-| Demo | 50% | Allow more experimentation |
-| Live | 70% | Require higher conviction for real money |
+Confidence threshold is now **user-configurable** via the Agent Settings UI slider (30%-90%).
+
+| Mode | Default | Range | Reasoning |
+|------|---------|-------|-----------|
+| Demo | 50% | 30-90% | Allow more experimentation by default |
+| Live | 70% | 30-90% | Require higher conviction for real money |
+
+**UI Location**: Agent Settings → Minimum Confidence slider
+**Visual Feedback**:
+- 30-50%: Red "Aggressive" badge - more trades, lower conviction
+- 51-70%: Yellow "Balanced" badge - moderate trade frequency
+- 71-90%: Green "Conservative" badge - fewer trades, higher quality
 
 ### Scheduler
 
@@ -145,10 +154,28 @@ stopAllSchedulers()
 
 #### Features
 
-- **Configurable Intervals**: Default 5 minutes, user-adjustable
+- **Configurable Intervals**: Default 5 minutes, user-adjustable (60s-3600s)
 - **Auto-Stop**: Stops scheduler if agent becomes inactive
 - **Concurrent Execution**: Multiple agents run independently
 - **Last Execution Tracking**: Updates `lastExecutionAt` timestamp
+- **Cost Estimation**: UI shows estimated daily LLM cost based on interval
+
+#### Execution Interval Configuration
+
+**UI Location**: Agent Settings → Execution Interval slider
+
+| Setting | Value | Executions/Day | Cost Estimate |
+|---------|-------|----------------|---------------|
+| Minimum | 60s (1 min) | 1,440 | ~$28/day/symbol |
+| Default | 300s (5 min) | 288 | ~$5.76/day/symbol |
+| Maximum | 3600s (1 hour) | 24 | ~$0.48/day/symbol |
+
+**Cost Formula**: `$0.02 per execution × executions/day × number of symbols`
+
+The slider shows:
+- Current interval formatted (e.g., "5m", "30m", "1h")
+- Estimated daily cost badge (e.g., "~$5.76/day")
+- Labels: "1 min" ↔ "1 hour", "Higher Cost" ↔ "Lower Cost"
 
 ### Demo vs Live Mode
 
@@ -451,6 +478,152 @@ const summary = formatIndicatorsForPrompt(indicators);
 // - Signals:
 //   • RSI: RSI oversold at 28.5
 //   • MACD: MACD bullish crossover
+```
+
+### Performance Statistics
+
+**File**: `src/lib/agent/performance-stats.ts`
+
+Calculates comprehensive trading performance metrics from closed trades and balance history.
+
+#### Core Metrics
+
+```typescript
+export interface PerformanceStats {
+  // Trade Statistics
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  winRate: number;              // 0-100%
+
+  // P&L Metrics
+  totalPnl: number;
+  grossProfit: number;
+  grossLoss: number;
+  avgWin: number;
+  avgLoss: number;
+  largestWin: number;
+  largestLoss: number;
+
+  // Risk Metrics
+  profitFactor: number;         // grossProfit / |grossLoss|
+  expectancy: number;           // Expected $ per trade
+  winLossRatio: number;         // avgWin / avgLoss
+
+  // Drawdown Analysis
+  maxDrawdown: number;          // Maximum peak-to-trough decline
+  maxDrawdownPercent: number;   // As percentage
+
+  // Trade Duration
+  avgHoldTimeHours: number;
+  longestWinHours: number;
+  longestLossHours: number;
+
+  // Equity Curve
+  equityCurve: Array<{ timestamp: Date; equity: number }>;
+}
+```
+
+#### API Endpoint
+
+**GET** `/api/agents/[id]/stats`
+
+Returns comprehensive performance statistics:
+
+```typescript
+{
+  stats: PerformanceStats,
+  summary: {
+    currentBalance: number,
+    unrealizedPnl: number,
+    currentEquity: number,
+    initialBalance: number,
+    totalReturn: number,        // Percentage
+    openPositions: number,
+    isDemo: boolean,
+    status: string
+  }
+}
+```
+
+#### UI Components
+
+**AgentPerformanceStats Component** (`src/components/trading/AgentPerformanceStats.tsx`)
+- Displays all metrics in a responsive grid
+- Color-coded values (green for positive, red for negative)
+- Compact mode for embedding in panels
+- Auto-refresh capability
+
+**AgentPerformanceChart Component** (`src/components/trading/AgentPerformanceChart.tsx`)
+- Equity curve visualization
+- Balance history line chart
+- Interactive tooltips
+
+#### Calculation Functions
+
+```typescript
+// Main calculation function
+calculatePerformanceStats(
+  trades: ClosedTrade[],
+  balanceSnapshots: BalanceSnapshot[],
+  initialBalance: number
+): PerformanceStats
+
+// Example metrics
+winRate = (winningTrades / totalTrades) * 100
+profitFactor = grossProfit / Math.abs(grossLoss)
+expectancy = (winRate * avgWin) - ((1 - winRate) * Math.abs(avgLoss))
+```
+
+### LLM Cost Visibility
+
+**UI Location**: Agent Settings → Today's AI Usage panel
+
+Real-time visibility into LLM API costs per agent.
+
+#### Metrics Displayed
+
+| Metric | Description |
+|--------|-------------|
+| Total Cost | Sum of all LLM API costs (24h) |
+| Total Calls | Number of LLM invocations |
+| Analyses | Market analysis calls |
+| Decisions | Trading decision calls |
+| Input Tokens | Tokens sent to LLM |
+| Output Tokens | Tokens received from LLM |
+
+#### API Endpoint
+
+**GET** `/api/agents/[id]/llm-usage?period=24h`
+
+```typescript
+{
+  stats: {
+    totalCalls: number,
+    totalInputTokens: number,
+    totalOutputTokens: number,
+    totalCost: number,
+    avgLatency: number,
+    successRate: number
+  },
+  byTask: Array<{
+    taskType: 'analysis' | 'decision',
+    calls: number,
+    cost: number
+  }>
+}
+```
+
+#### Database Table
+
+```sql
+llm_usage (
+  id, agentId, userId,
+  model, provider, taskType,
+  inputTokens, outputTokens, totalTokens,
+  costUsd, latencyMs, success,
+  createdAt
+)
 ```
 
 ---
@@ -801,9 +974,9 @@ const DEFAULT_CIRCUIT_CONFIG = {
 
 ## Future Optimizations
 
-### Completed (v1.1)
+### Completed (v1.2)
 
-#### ✅ 1. Position Sizing Strategy Selection (DONE)
+#### ✅ 1. Position Sizing Strategy Selection (v1.1)
 Users can now select from 4 strategies in Agent Settings:
 - **Fixed Percentage**: Risk a fixed % of account per trade (simple, predictable)
 - **Kelly Criterion**: Optimize position size based on historical win rate (growth-optimized)
@@ -814,7 +987,7 @@ Users can now select from 4 strategies in Agent Settings:
 **API**: `PATCH /api/agents/[id]/trading-config` with `positionSizing` payload
 **Executor**: Reads `agent.policies.positionSizing.strategy` and applies in `calculateOptimalPositionSize()`
 
-#### ✅ 2. Trailing Stop Configuration (DONE)
+#### ✅ 2. Trailing Stop Configuration (v1.1)
 Users can now configure trailing stop behavior in Agent Settings:
 - **Fixed**: No trailing - stop stays where it was set
 - **Trailing %**: Follows price by X%, locks in profits dynamically
@@ -826,33 +999,66 @@ Users can now configure trailing stop behavior in Agent Settings:
 **API**: `PATCH /api/agents/[id]/trading-config` with `trailingStop` payload
 **Executor**: Reads `agent.policies.trailingStop` and applies in `checkAndUpdateTrailingStops()`
 
-### High Priority
+#### ✅ 3. Performance Statistics Dashboard (v1.2)
+Comprehensive trading metrics calculated from closed trades:
+- **Trade Stats**: Win rate, total trades, winning/losing count
+- **P&L Metrics**: Total P&L, avg win/loss, profit factor, expectancy
+- **Risk Metrics**: Max drawdown, win/loss ratio
+- **Duration**: Average hold time, longest win/loss
 
-#### 3. Historical Trade Statistics Dashboard
-Display win rate, avg win/loss ratio, Sharpe ratio, etc. Used by Kelly Criterion but not shown to users.
+**UI Location**: Terminal Panel → STATS tab, Performance Chart on agent page
+**API**: `GET /api/agents/[id]/stats`
+**Components**: `AgentPerformanceStats`, `AgentPerformanceChart`
+
+#### ✅ 4. Confidence Threshold Slider (v1.2)
+User-configurable minimum confidence for trade execution:
+- **Range**: 30% (aggressive) to 90% (conservative)
+- **Visual feedback**: Color-coded badges (red/yellow/green)
+- **Impact**: Controls trade frequency vs quality tradeoff
+
+**UI Location**: Agent Settings → Minimum Confidence slider
+**Executor**: Filters decisions below `policies.confidenceThreshold`
+
+#### ✅ 5. Execution Interval Guardrails (v1.2)
+User-configurable interval with cost awareness:
+- **Range**: 60 seconds (1 min) to 3600 seconds (1 hour)
+- **Cost estimate**: Shows estimated daily LLM cost based on interval
+- **Formula**: `$0.02 × executions/day × symbols`
+
+**UI Location**: Agent Settings → Execution Interval slider
+**Scheduler**: Reads `agent.executionInterval` for timer interval
+
+#### ✅ 6. LLM Cost Visibility (v1.2)
+Real-time view of AI usage costs:
+- **Today's cost**: Total $ spent on LLM calls (24h)
+- **Breakdown**: Analyses vs decisions, input/output tokens
+- **Refresh**: Manual refresh button for latest data
+
+**UI Location**: Agent Settings → Today's AI Usage panel
+**API**: `GET /api/agents/[id]/llm-usage?period=24h`
 
 ### Medium Priority
 
-#### 4. Multi-Timeframe Analysis
+#### 7. Multi-Timeframe Analysis
 Currently uses 1h candles only. Add:
 - 15m for entry timing
 - 4h for trend confirmation
 - 1D for major S/R levels
 
-#### 5. Sentiment Data Integration
+#### 8. Sentiment Data Integration
 Add external data sources:
 - Fear & Greed Index
 - Social sentiment (Twitter, Reddit)
 - Funding rate trends
 - Liquidation data
 
-#### 6. Portfolio-Level Risk Management
+#### 9. Portfolio-Level Risk Management
 Currently per-position. Add:
 - Total portfolio exposure limits
 - Correlation-aware sizing
 - Sector concentration limits
 
-#### 7. Backtesting Engine
+#### 10. Backtesting Engine
 Simulate agent performance on historical data:
 - Test strategy changes before deploying
 - Optimize parameters
@@ -860,19 +1066,19 @@ Simulate agent performance on historical data:
 
 ### Lower Priority
 
-#### 8. Agent Evolution (Genetic Algorithms)
+#### 11. Agent Evolution (Genetic Algorithms)
 Use `agent_genomes` table for:
 - Mutation of successful strategies
 - Crossover between top performers
 - Tournament selection
 
-#### 9. Real-Time Execution
+#### 12. Real-Time Execution
 Currently interval-based. Add:
 - WebSocket price streaming
 - Event-triggered execution
 - Faster response to market moves
 
-#### 10. Order Type Expansion
+#### 13. Order Type Expansion
 Currently market orders only. Add:
 - Limit orders with patience
 - Stop-limit entries
@@ -892,18 +1098,43 @@ Currently market orders only. Add:
 | `src/lib/agent/trailing-stop.ts` | Trailing stop-loss |
 | `src/lib/agent/resilience.ts` | Retry + circuit breaker |
 | `src/lib/agent/technical-analysis.ts` | Technical indicators |
+| `src/lib/agent/performance-stats.ts` | Performance metrics calculation |
 | `src/lib/agent/index.ts` | Module exports |
 | `src/lib/llm/index.ts` | LLM provider integration |
 | `src/lib/llm/prompts.ts` | Trading prompt templates |
 | `src/lib/hyperliquid/` | Exchange integration |
 | `src/lib/db/schema.ts` | Database schema |
+| `src/app/api/agents/[id]/stats/route.ts` | Performance stats API |
+| `src/app/api/agents/[id]/llm-usage/route.ts` | LLM usage API |
+| `src/components/trading/AgentPerformanceStats.tsx` | Stats display component |
+| `src/components/trading/AgentPerformanceChart.tsx` | Equity chart component |
+| `src/components/trading/SimpleAgentSettings.tsx` | Agent settings panel |
 
 ---
 
 *Last Updated: December 2024*
-*Version: 1.1*
+*Version: 1.2*
 
 ### Changelog
+
+**v1.2** (December 2024)
+- Added Performance Statistics module (`performance-stats.ts`)
+  - Comprehensive metrics: win rate, profit factor, expectancy, max drawdown
+  - API endpoint: `GET /api/agents/[id]/stats`
+  - UI components: `AgentPerformanceStats`, `AgentPerformanceChart`
+  - Terminal Panel now has STATS tab
+- Added Confidence Threshold slider (30-90%)
+  - User can adjust trade frequency vs quality
+  - Visual feedback with color-coded badges
+  - Connected to executor decision filtering
+- Added Execution Interval slider with guardrails
+  - Range: 60s (1 min) to 3600s (1 hour)
+  - Shows estimated daily LLM cost
+  - Connected to scheduler timer
+- Added LLM Cost Visibility panel
+  - Today's AI usage: cost, calls, tokens
+  - Breakdown by task type (analysis vs decision)
+  - Manual refresh button
 
 **v1.1** (December 2024)
 - Added user-configurable Position Sizing Strategy dropdown (4 strategies)
