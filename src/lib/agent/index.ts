@@ -61,3 +61,27 @@ export {
   type TechnicalSignal,
   type SupportResistance,
 } from './technical-analysis';
+
+// Risk management
+export {
+  performRiskChecks,
+  isDuplicateDecision,
+  recordDecision,
+  clearDecisionCache,
+  checkPositionLimits,
+  getOpenPositionCount,
+  checkDrawdownLimit,
+  emergencyStopAgent,
+  resetPeakBalance,
+  type RiskConfig,
+  type RiskCheckResult,
+  DEFAULT_RISK_CONFIG,
+} from './risk-management';
+
+// Performance statistics
+export {
+  calculatePerformanceStats,
+  type PerformanceStats,
+  type ClosedTrade,
+  type BalanceSnapshot,
+} from './performance-stats';

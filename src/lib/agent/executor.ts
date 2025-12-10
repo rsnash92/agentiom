@@ -62,6 +62,13 @@ import {
   formatIndicatorsForPrompt,
   type Candle,
 } from './technical-analysis';
+import {
+  performRiskChecks,
+  recordDecision,
+  emergencyStopAgent,
+  RiskConfig,
+  DEFAULT_RISK_CONFIG,
+} from './risk-management';
 import type { CandleData } from '@/lib/hyperliquid';
 
 // Types
@@ -97,6 +104,12 @@ interface AgentConfig {
       stepPercent?: number;
       stepGain?: number;
       breakevenTriggerPercent?: number;
+    };
+    // Risk limits (user-configurable)
+    riskLimits?: {
+      maxOpenPositions?: number;
+      maxCorrelatedPositions?: number;
+      decisionCooldownSeconds?: number;
     };
   };
   llmConfig: AgentLLMConfig;
@@ -305,6 +318,48 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
       // 8. Execute if confidence is high enough (user-configurable, defaults: 50% demo, 70% live)
       const confidenceThreshold = config.policies.confidenceThreshold ?? (config.isDemo ? 50 : 70);
       if (decision.action !== 'hold' && decision.confidence >= confidenceThreshold) {
+        // 8a. Perform risk checks before execution
+        const riskConfig: Partial<RiskConfig> = {
+          maxDrawdownPct: config.policies.maxDrawdownPct,
+          initialBalance: config.isDemo ? 5000 : accountState.accountValue,
+          maxOpenPositions: config.policies.riskLimits?.maxOpenPositions ?? DEFAULT_RISK_CONFIG.maxOpenPositions,
+          maxCorrelatedPositions: config.policies.riskLimits?.maxCorrelatedPositions ?? DEFAULT_RISK_CONFIG.maxCorrelatedPositions,
+          decisionCooldownMs: (config.policies.riskLimits?.decisionCooldownSeconds ?? 300) * 1000,
+        };
+
+        const riskCheck = await performRiskChecks(
+          agentId,
+          decision.action,
+          market.coin,
+          accountState.accountValue,
+          riskConfig
+        );
+
+        // Log warnings
+        for (const warning of riskCheck.warnings) {
+          await logAgentThinking(agentId, `⚠️ Risk warning: ${warning}`);
+        }
+
+        // Check if we need to emergency stop
+        if (riskCheck.shouldStopAgent) {
+          await emergencyStopAgent(agentId, riskCheck.reasons.join('; '));
+          await logAgentError(agentId, `🚨 EMERGENCY STOP: ${riskCheck.reasons.join('; ')}`);
+          return results; // Stop execution immediately
+        }
+
+        // Check if trade is blocked by risk limits
+        if (!riskCheck.allowed) {
+          await logAgentThinking(agentId, `🚫 Trade blocked by risk limits: ${riskCheck.reasons.join('; ')}`);
+          results.push({
+            success: true,
+            decision,
+            executed: false,
+            error: `Risk blocked: ${riskCheck.reasons.join('; ')}`,
+            llmCost: totalLLMCost,
+          });
+          continue; // Skip to next market
+        }
+
         let result: { success: boolean; orderId?: string; error?: string };
 
         if (config.isDemo) {
@@ -315,6 +370,11 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
           const privateKey = decryptPrivateKey(config.apiKeyEncrypted) as Hex;
           const trader = createServerTrader(privateKey, process.env.HYPERLIQUID_NETWORK === 'testnet');
           result = await executeDecision(trader, config, decision, accountState);
+        }
+
+        // Record successful decision to prevent duplicates
+        if (result.success && (decision.action === 'buy' || decision.action === 'sell')) {
+          recordDecision(agentId, decision.action, market.coin);
         }
 
         results.push({
