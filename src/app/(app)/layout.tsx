@@ -10,6 +10,7 @@ import { ConnectButton } from '@/components/auth/ConnectButton';
 const navigation = [
   { name: 'My Agents', href: '/agents' },
   { name: 'Leaderboard', href: '/leaderboard' },
+  { name: 'New Agent', href: '/agents/new' },
 ];
 
 export default function AppLayout({
