@@ -19,11 +19,21 @@ const SYMBOLS = [
   { id: 'HYPE', name: 'HYPE/USDT' },
 ];
 
+const POSITION_SIZING_STRATEGIES = [
+  { id: 'fixed_fractional', name: 'Fixed Percentage', description: 'Risk a fixed % of account per trade' },
+  { id: 'kelly_criterion', name: 'Kelly Criterion', description: 'Optimize for long-term growth based on win rate' },
+  { id: 'volatility_adjusted', name: 'Volatility-Adjusted', description: 'Smaller positions in volatile markets' },
+  { id: 'risk_per_trade', name: 'Fixed Risk', description: 'Risk $X per trade regardless of setup' },
+] as const;
+
+type PositionSizingStrategy = typeof POSITION_SIZING_STRATEGIES[number]['id'];
+
 export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsProps) {
   const { agent, updateAgent, executeOnce } = useAgent(agentId);
 
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>(['BTC', 'ETH', 'SOL']);
   const [prompt, setPrompt] = useState('');
+  const [positionSizing, setPositionSizing] = useState<PositionSizingStrategy>('fixed_fractional');
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executeResult, setExecuteResult] = useState<string | null>(null);
@@ -33,6 +43,7 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
     if (agent) {
       setSelectedSymbols(agent.policies?.approvedPairs || ['BTC', 'ETH', 'SOL']);
       setPrompt(agent.personality || '');
+      setPositionSizing(agent.policies?.positionSizing?.strategy || 'fixed_fractional');
     }
   }, [agent]);
 
@@ -62,6 +73,10 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
         policies: {
           ...agent.policies,
           approvedPairs: selectedSymbols,
+          positionSizing: {
+            ...agent.policies?.positionSizing,
+            strategy: positionSizing,
+          },
         },
       });
     } finally {
@@ -147,6 +162,25 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
               {prompt.length}/1000
             </span>
           </div>
+        </div>
+
+        {/* Position Sizing Strategy */}
+        <div>
+          <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block">Position Sizing Strategy</label>
+          <select
+            value={positionSizing}
+            onChange={(e) => setPositionSizing(e.target.value as PositionSizingStrategy)}
+            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary text-xs sm:text-sm"
+          >
+            {POSITION_SIZING_STRATEGIES.map((strategy) => (
+              <option key={strategy.id} value={strategy.id}>
+                {strategy.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-[10px] sm:text-xs text-foreground-subtle">
+            {POSITION_SIZING_STRATEGIES.find(s => s.id === positionSizing)?.description}
+          </p>
         </div>
 
         {/* Run Now Button */}

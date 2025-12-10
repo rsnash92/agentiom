@@ -19,6 +19,18 @@ export interface Agent {
     maxPositionSizePct: number;
     maxDrawdownPct: number;
     approvedPairs: string[];
+    positionSizing?: {
+      strategy: 'fixed_fractional' | 'kelly_criterion' | 'volatility_adjusted' | 'risk_per_trade';
+      maxRiskPerTrade?: number;
+      kellyFraction?: number;
+      volatilityMultiplier?: number;
+    };
+    trailingStop?: {
+      enabled: boolean;
+      type: 'percentage' | 'atr' | 'step' | 'breakeven';
+      trailPercent?: number;
+      atrMultiplier?: number;
+    };
   };
   llmProvider: string;
   llmConfig?: {
@@ -66,11 +78,23 @@ export interface UpdateAgentInput {
   personality?: string;
   strategy?: string;
   policies?: {
-    maxLeverage: number;
-    maxPositionSizeUsd: number;
-    maxPositionSizePct: number;
-    maxDrawdownPct: number;
-    approvedPairs: string[];
+    maxLeverage?: number;
+    maxPositionSizeUsd?: number;
+    maxPositionSizePct?: number;
+    maxDrawdownPct?: number;
+    approvedPairs?: string[];
+    positionSizing?: {
+      strategy?: 'fixed_fractional' | 'kelly_criterion' | 'volatility_adjusted' | 'risk_per_trade';
+      maxRiskPerTrade?: number;
+      kellyFraction?: number;
+      volatilityMultiplier?: number;
+    };
+    trailingStop?: {
+      enabled?: boolean;
+      type?: 'percentage' | 'atr' | 'step' | 'breakeven';
+      trailPercent?: number;
+      atrMultiplier?: number;
+    };
   };
   llmProvider?: 'claude' | 'openai' | 'deepseek';
   executionIntervalSeconds?: number;
