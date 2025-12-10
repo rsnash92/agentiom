@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { usePrivy } from '@privy-io/react-auth';
 import { useAgents } from '@/lib/hooks';
 import { ProtectedRoute } from '@/components/auth';
+import { AgentTemplateSelector } from '@/components/agent/AgentTemplateSelector';
+import type { AgentTemplate } from '@/config/agent-templates';
 
 // Available models
 const MODELS = [
@@ -32,10 +34,16 @@ const EXAMPLE_PROMPTS = `EX:
 "ACT LIKE AN EXPERIENCED CRYPTO ANALYST EXPLAINING DECISIONS CLEARLY."
 "FOCUS ON SAFE, LOW RISK TRADING WITH TIGHT STOP LOSSES."`;
 
-function CreateAgentModal() {
+type CreationStep = 'template' | 'configure';
+
+function CreateAgentPage() {
   const router = useRouter();
   const { authenticated, login } = usePrivy();
   const { createAgent, error: agentError } = useAgents();
+
+  // Flow state
+  const [step, setStep] = useState<CreationStep>('template');
+  const [selectedTemplate, setSelectedTemplate] = useState<AgentTemplate | null>(null);
 
   // Form state
   const [tradingMode, setTradingMode] = useState<'demo' | 'live'>('demo');
@@ -59,6 +67,31 @@ function CreateAgentModal() {
 
   // Suppress unused variable warning
   void isValidatingCode;
+
+  // Apply template settings when selected
+  const handleTemplateSelect = (template: AgentTemplate) => {
+    setSelectedTemplate(template);
+
+    // Pre-fill form with template values
+    setName(template.name);
+    setPrompt(template.config.personality);
+    setSelectedSymbols(template.config.approvedPairs);
+    setMaxLeverage(template.config.policies.maxLeverage);
+    setMaxPositionSize(template.config.policies.maxPositionSizeUsd);
+    setMaxDrawdown(template.config.policies.maxDrawdownPct);
+
+    // Set model if specified
+    if (template.config.llmConfig?.primaryModel) {
+      setSelectedModel(template.config.llmConfig.primaryModel);
+    }
+
+    setStep('configure');
+  };
+
+  const handleSkipTemplate = () => {
+    setSelectedTemplate(null);
+    setStep('configure');
+  };
 
   // Validate invite code (required for both demo and live)
   useEffect(() => {
@@ -124,12 +157,6 @@ function CreateAgentModal() {
       return;
     }
 
-    // Skip invite validation during development
-    // if (!inviteCodeValid) {
-    //   setError('Please enter a valid invite code');
-    //   return;
-    // }
-
     setIsSubmitting(true);
     setError(null);
 
@@ -153,7 +180,6 @@ function CreateAgentModal() {
       if (agent) {
         router.push(`/agents/${agent.id}`);
       } else {
-        // Use error from hook if available
         setError(agentError || 'Failed to create agent. Please try again.');
       }
     } catch (err) {
@@ -167,13 +193,43 @@ function CreateAgentModal() {
     router.push('/agents');
   };
 
+  const handleBackToTemplates = () => {
+    setStep('template');
+  };
+
+  // Template Selection Step
+  if (step === 'template') {
+    return (
+      <ProtectedRoute>
+        <AgentTemplateSelector
+          onSelect={handleTemplateSelect}
+          onSkip={handleSkipTemplate}
+        />
+      </ProtectedRoute>
+    );
+  }
+
+  // Configure Agent Step
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background/80 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-4">
         <div className="w-full max-w-lg bg-card border border-border rounded-xl sm:rounded-2xl shadow-2xl overflow-hidden my-2 sm:my-0">
           {/* Header */}
           <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
-            <h1 className="text-base sm:text-lg font-semibold tracking-wide">CREATE AGENT</h1>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBackToTemplates}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-background-secondary transition-colors"
+              >
+                <ChevronLeftIcon className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-base sm:text-lg font-semibold tracking-wide">CREATE AGENT</h1>
+                {selectedTemplate && (
+                  <p className="text-xs text-primary">Template: {selectedTemplate.name}</p>
+                )}
+              </div>
+            </div>
             <button
               onClick={handleClose}
               className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-background-secondary transition-colors"
@@ -184,6 +240,21 @@ function CreateAgentModal() {
 
           {/* Content */}
           <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[calc(100vh-140px)] sm:max-h-[calc(100vh-200px)] overflow-y-auto">
+            {/* Template Banner (if using template) */}
+            {selectedTemplate && (
+              <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <TemplateIcon className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-primary font-medium">Using Template: {selectedTemplate.name}</p>
+                    <p className="text-xs text-primary/70 mt-0.5">
+                      Pre-configured with {selectedTemplate.goals.length} goals. You can customize below.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Trading Mode Toggle */}
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -280,12 +351,12 @@ function CreateAgentModal() {
                 <input
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value.slice(0, 20))}
+                  onChange={(e) => setName(e.target.value.slice(0, 30))}
                   placeholder="ENTER AGENT NAME"
                   className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-border rounded-lg text-sm sm:text-base text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-primary uppercase tracking-wider"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-foreground-subtle">
-                  {name.length}/20
+                  {name.length}/30
                 </span>
               </div>
             </div>
@@ -344,7 +415,9 @@ function CreateAgentModal() {
 
             {/* Prompt Design */}
             <div>
-              <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block">Prompt Design (Optional)</label>
+              <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block">
+                Prompt Design {selectedTemplate ? '(Template Applied)' : '(Optional)'}
+              </label>
               <div className="relative">
                 <textarea
                   value={prompt}
@@ -366,6 +439,7 @@ function CreateAgentModal() {
             >
               <ChevronDownIcon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
               Advanced Settings
+              {selectedTemplate && <span className="text-primary text-xs">(From Template)</span>}
             </button>
 
             {/* Advanced Settings */}
@@ -441,13 +515,21 @@ function CreateAgentModal() {
   );
 }
 
-export default CreateAgentModal;
+export default CreateAgentPage;
 
 // Icons
 function CloseIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  );
+}
+
+function ChevronLeftIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M15 18l-6-6 6-6" />
     </svg>
   );
 }
@@ -483,6 +565,15 @@ function CheckIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
       <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+
+function TemplateIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M3 9h18M9 21V9" />
     </svg>
   );
 }
