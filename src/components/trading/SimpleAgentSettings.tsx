@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAgent } from '@/lib/hooks';
 
 interface SimpleAgentSettingsProps {
@@ -20,10 +20,30 @@ const SYMBOLS = [
 ];
 
 const POSITION_SIZING_STRATEGIES = [
-  { id: 'fixed_fractional', name: 'Fixed Percentage', description: 'Risk a fixed % of account per trade' },
-  { id: 'kelly_criterion', name: 'Kelly Criterion', description: 'Optimize for long-term growth based on win rate' },
-  { id: 'volatility_adjusted', name: 'Volatility-Adjusted', description: 'Smaller positions in volatile markets' },
-  { id: 'risk_per_trade', name: 'Fixed Risk', description: 'Risk $X per trade regardless of setup' },
+  {
+    id: 'fixed_fractional',
+    name: 'Fixed Percentage',
+    description: 'Risk a fixed % of account per trade. Simple and consistent position sizing.',
+    tags: [{ label: 'Conservative', color: 'primary' }, { label: 'Simple', color: 'success' }],
+  },
+  {
+    id: 'kelly_criterion',
+    name: 'Kelly Criterion',
+    description: 'Mathematically optimal sizing based on win rate and reward ratio for maximum growth.',
+    tags: [{ label: 'Advanced', color: 'warning' }, { label: 'Optimal', color: 'primary' }],
+  },
+  {
+    id: 'volatility_adjusted',
+    name: 'Volatility-Adjusted',
+    description: 'Dynamically reduces position size in volatile markets using ATR-based calculations.',
+    tags: [{ label: 'Adaptive', color: 'primary' }, { label: 'Risk-Aware', color: 'success' }],
+  },
+  {
+    id: 'risk_per_trade',
+    name: 'Fixed Risk ($)',
+    description: 'Risk a fixed dollar amount per trade regardless of account size or market conditions.',
+    tags: [{ label: 'Simple', color: 'success' }, { label: 'Fixed', color: 'foreground-muted' }],
+  },
 ] as const;
 
 type PositionSizingStrategy = typeof POSITION_SIZING_STRATEGIES[number]['id'];
@@ -34,9 +54,23 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>(['BTC', 'ETH', 'SOL']);
   const [prompt, setPrompt] = useState('');
   const [positionSizing, setPositionSizing] = useState<PositionSizingStrategy>('fixed_fractional');
+  const [strategyDropdownOpen, setStrategyDropdownOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executeResult, setExecuteResult] = useState<string | null>(null);
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setStrategyDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Load agent data
   useEffect(() => {
@@ -101,6 +135,8 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
     }
   };
 
+  const selectedStrategy = POSITION_SIZING_STRATEGIES.find(s => s.id === positionSizing);
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -164,23 +200,71 @@ export function SimpleAgentSettings({ agentId, onClose }: SimpleAgentSettingsPro
           </div>
         </div>
 
-        {/* Position Sizing Strategy */}
-        <div>
-          <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block">Position Sizing Strategy</label>
-          <select
-            value={positionSizing}
-            onChange={(e) => setPositionSizing(e.target.value as PositionSizingStrategy)}
-            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary text-xs sm:text-sm"
+        {/* Strategy Dropdown - Professional Style */}
+        <div ref={dropdownRef} className="relative">
+          <label className="text-xs sm:text-sm text-foreground-muted mb-1.5 sm:mb-2 block flex items-center gap-2">
+            Strategy
+            <span className="w-full h-px bg-border flex-1 ml-1" />
+          </label>
+
+          {/* Selected Strategy Button */}
+          <button
+            onClick={() => setStrategyDropdownOpen(!strategyDropdownOpen)}
+            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-background border border-primary rounded-lg text-foreground focus:outline-none text-xs sm:text-sm flex items-center justify-between"
           >
-            {POSITION_SIZING_STRATEGIES.map((strategy) => (
-              <option key={strategy.id} value={strategy.id}>
-                {strategy.name}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-[10px] sm:text-xs text-foreground-subtle">
-            {POSITION_SIZING_STRATEGIES.find(s => s.id === positionSizing)?.description}
-          </p>
+            <span>{selectedStrategy?.name}</span>
+            <ChevronIcon className={`w-4 h-4 text-foreground-muted transition-transform ${strategyDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Dropdown Panel */}
+          {strategyDropdownOpen && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl z-50 overflow-hidden">
+              {/* Strategies Header */}
+              <div className="px-3 py-2 border-b border-border">
+                <span className="text-[10px] sm:text-xs text-foreground-muted uppercase tracking-wide">Strategies</span>
+              </div>
+
+              {/* Strategy List */}
+              <div className="max-h-64 overflow-y-auto">
+                {POSITION_SIZING_STRATEGIES.map((strategy) => (
+                  <button
+                    key={strategy.id}
+                    onClick={() => {
+                      setPositionSizing(strategy.id);
+                      setStrategyDropdownOpen(false);
+                    }}
+                    className={`w-full px-3 py-3 text-left hover:bg-background/50 transition-colors ${
+                      positionSizing === strategy.id ? 'bg-primary/10 border-l-2 border-l-primary' : ''
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <span className={`text-xs sm:text-sm font-medium ${positionSizing === strategy.id ? 'text-primary' : 'text-foreground'}`}>
+                        {strategy.name}
+                      </span>
+                      <div className="flex gap-1 flex-shrink-0">
+                        {strategy.tags.map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium border ${
+                              tag.color === 'primary' ? 'text-primary border-primary/50' :
+                              tag.color === 'success' ? 'text-success border-success/50' :
+                              tag.color === 'warning' ? 'text-warning border-warning/50' :
+                              'text-foreground-muted border-border'
+                            }`}
+                          >
+                            {tag.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-[10px] sm:text-xs text-foreground-muted leading-relaxed">
+                      {strategy.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Run Now Button */}
@@ -251,6 +335,14 @@ function PlayIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
       <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="m6 9 6 6 6-6" />
     </svg>
   );
 }
