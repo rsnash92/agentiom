@@ -1,6 +1,6 @@
 # Agentiom Agent Execution Engine
 
-## Technical Documentation v1.2
+## Technical Documentation v1.3
 
 ---
 
@@ -18,6 +18,8 @@
    - [Resilience (Retry & Circuit Breaker)](#resilience)
    - [Technical Analysis](#technical-analysis)
    - [Performance Statistics](#performance-statistics)
+   - [Market Regime Detection](#market-regime-detection)
+   - [Structured Logging](#structured-logging)
 5. [Execution Flow](#execution-flow)
 6. [LLM Integration](#llm-integration)
 7. [Database Schema](#database-schema)
@@ -575,6 +577,168 @@ profitFactor = grossProfit / Math.abs(grossLoss)
 expectancy = (winRate * avgWin) - ((1 - winRate) * Math.abs(avgLoss))
 ```
 
+### Market Regime Detection
+
+**File**: `src/lib/agent/market-regime.ts`
+
+Classifies current market conditions to help agents adapt their trading strategies.
+
+#### Regime Types
+
+| Regime | Description | Trading Guidance |
+|--------|-------------|------------------|
+| `TRENDING_UP` | Clear uptrend with momentum | Buy dips, trail stops higher, avoid shorting |
+| `TRENDING_DOWN` | Clear downtrend with momentum | Sell rallies, trail stops lower, avoid longing |
+| `RANGING` | Sideways consolidation | Mean reversion, buy support, sell resistance |
+| `HIGH_VOLATILITY` | Choppy, erratic price action | Reduce position sizes, use wider stops |
+| `LOW_VOLATILITY` | Quiet market, potential breakout | Watch for breakout, consider pending orders |
+
+#### Detection Logic
+
+```typescript
+export function detectMarketRegime(input: RegimeDetectionInput): RegimeDetectionResult {
+  // Analyzes:
+  // - 24h and 7d price changes
+  // - RSI overbought/oversold
+  // - MACD histogram direction
+  // - EMA alignment (12/26)
+  // - Bollinger Band width
+  // - ATR-based volatility
+  // - Volume vs average
+
+  // Returns regime with confidence score
+}
+```
+
+#### Risk Multipliers
+
+Each regime returns a risk multiplier for position sizing:
+- `TRENDING_UP/DOWN`: 1.2x (can size up in clear trends)
+- `RANGING`: 0.8x (slightly reduced in choppy markets)
+- `HIGH_VOLATILITY`: 0.5x (significantly reduced)
+- `LOW_VOLATILITY`: 0.75x (reduced, waiting for breakout)
+
+#### Integration
+
+```typescript
+// In executor.ts - after fetching market data
+market.regime = detectMarketRegime({
+  currentPrice: market.price,
+  priceChange24h: market.priceChange24h,
+  indicators: market.technicalIndicators,
+  volume24h: market.volume24h,
+});
+
+// Regime is included in LLM prompts
+const promptOptions = market.regime
+  ? { marketRegime: formatRegimeForPrompt(market.regime) }
+  : undefined;
+```
+
+### Structured Logging
+
+**File**: `src/lib/agent/logger.ts`
+
+Provides consistent, structured logging for observability across all agent operations.
+
+#### Log Format
+
+```
+[timestamp] [LEVEL] message (durationMs) {"context": "json"}
+```
+
+Example:
+```
+[2024-12-10T14:30:00.000Z] [INFO] Execution cycle completed (2340ms) {"agentId":"abc123","cycle":42,"trades":2,"llmCost":0.0245}
+```
+
+#### Logger API
+
+```typescript
+// Global logger
+import { logger } from './logger';
+
+logger.debug('Debug message', { key: 'value' });
+logger.info('Info message', { key: 'value' });
+logger.warn('Warning message', { key: 'value' });
+logger.error('Error message', { key: 'value' });
+
+// Agent-specific logger (recommended)
+import { createAgentLogger } from './logger';
+
+const log = createAgentLogger(agentId);
+
+// Execution lifecycle
+log.cycleStart(cycleNumber);
+log.cycleEnd(cycleNumber, { trades: 2, llmCost: 0.0245 }, durationMs);
+
+// Market analysis
+log.analysisStart(['BTC', 'ETH']);
+log.analysisResult('bullish', 'high', latencyMs);
+
+// Trading decisions
+log.decisionReceived('BTC', 'buy', 75, latencyMs);
+log.decisionBlocked('BTC', 'buy', 'Max positions reached');
+
+// Trade execution
+log.tradeExecuted('BTC', 'buy', 0.01, { success: true, orderId: 'xxx' });
+log.tradeError('BTC', 'buy', 'Insufficient margin');
+
+// Risk events
+log.riskWarning('Approaching max drawdown', { currentDrawdown: 18 });
+log.emergencyStop('Max drawdown exceeded');
+
+// Market regime
+log.regimeDetected('BTC', 'TRENDING_UP', 85);
+```
+
+#### Timing Helpers
+
+```typescript
+import { timed, createTimer } from './logger';
+
+// Time an async operation
+const { result, durationMs } = await timed(() => callLLM(prompt));
+console.log(`LLM call took ${durationMs}ms`);
+
+// Manual timer
+const timer = createTimer();
+timer.start();
+// ... do work ...
+console.log(`Elapsed: ${timer.elapsed()}ms`);
+const duration = timer.stop();
+```
+
+#### In-Memory Metrics
+
+```typescript
+import { agentMetrics } from './logger';
+
+// Increment counters
+agentMetrics.incrementCycles();
+agentMetrics.incrementTrades(success: boolean);
+agentMetrics.recordLLMCall(cost, latencyMs);
+agentMetrics.incrementRiskBlock();
+agentMetrics.incrementEmergencyStop();
+
+// Get metrics snapshot
+const metrics = agentMetrics.getMetrics();
+// {
+//   executionCycles: 42,
+//   tradesExecuted: 15,
+//   tradesFailed: 2,
+//   llmCalls: 84,
+//   llmTotalCost: 2.05,
+//   llmAvgLatencyMs: 1850,
+//   riskBlocks: 3,
+//   emergencyStops: 0,
+//   tradeSuccessRate: 88
+// }
+
+// Reset metrics
+agentMetrics.reset();
+```
+
 ### LLM Cost Visibility
 
 **UI Location**: Agent Settings → Today's AI Usage panel
@@ -974,7 +1138,7 @@ const DEFAULT_CIRCUIT_CONFIG = {
 
 ## Future Optimizations
 
-### Completed (v1.2)
+### Completed (v1.3)
 
 #### ✅ 1. Position Sizing Strategy Selection (v1.1)
 Users can now select from 4 strategies in Agent Settings:
@@ -1080,28 +1244,132 @@ recordDecision(agentId, action, symbol);
 **Executor**: Integrated into `executeAgentCycle()` at step 8a
 **Module**: `src/lib/agent/risk-management.ts`
 
+#### ✅ 8. Market Regime Detection (v1.3)
+Classify market conditions before making decisions:
+- **TRENDING_UP**: Clear uptrend, buy dips
+- **TRENDING_DOWN**: Clear downtrend, sell rallies
+- **RANGING**: Sideways, mean reversion works
+- **HIGH_VOLATILITY**: Choppy, reduce size
+- **LOW_VOLATILITY**: Quiet, breakout possible
+
+**Detection Signals**:
+- 24h/7d price changes for trend direction
+- RSI overbought/oversold (70/30)
+- MACD histogram direction
+- EMA 12/26 alignment
+- Bollinger Band width for volatility
+- ATR-based volatility measurement
+- Volume vs average comparison
+
+**Risk Multipliers**:
+- Trending: 1.2x (favor direction)
+- Ranging: 0.8x (reduce size)
+- High Volatility: 0.5x (protect capital)
+- Low Volatility: 0.75x (await breakout)
+
+**Module**: `src/lib/agent/market-regime.ts`
+**Executor**: Detects regime per symbol and includes in LLM prompts
+
+#### ✅ 9. Recent Trade History in Prompt (v1.3)
+Include recent trades for context to prevent revenge trading:
+- **Last 5 trades**: Entry prices and P&L results
+- **Warnings in prompt**: Avoid revenge trading, overtrading, repeating mistakes
+- **24h lookback**: Only recent context matters
+
+**Implementation**:
+```typescript
+// In executor.ts - buildAgentContext fetches recent trades
+const recentClosedTrades = await db.select({...})
+  .from(positions)
+  .where(eq(positions.status, 'closed'))
+  .orderBy(desc(positions.closedAt))
+  .limit(10);
+
+// In prompts.ts - added to buildTradingDecisionPrompt
+Recent Trades (last 24h):
+- BUY BTC @ $97,500 → +$125.00
+- SELL ETH @ $3,800 → -$45.00
+...
+```
+
+**Module**: `src/lib/llm/prompts.ts`
+**Executor**: `buildAgentContext()` now async, fetches recent trades
+
+#### ✅ 10. Type Safety for LLM Responses (v1.3)
+Zod schema validation for type-safe LLM response parsing:
+- **TradingDecisionSchema**: action, coin, size, leverage, confidence, reasoning
+- **MarketAnalysisSchema**: sentiment, volatility, opportunities
+- **PositionManagementSchema**: position actions and adjustments
+- **RiskAssessmentSchema**: risk level, concerns, recommendations
+
+**Validation Functions**:
+```typescript
+import { validateTradingDecisionSchema, validateMarketAnalysis } from './schemas';
+
+const rawParsed = parseJsonResponse<unknown>(response.content);
+const validation = validateTradingDecisionSchema(rawParsed, response.content);
+
+if (validation.success && validation.data) {
+  const decision = validation.data.decision;
+  // Type-safe access to all fields
+} else {
+  log.warn('Schema validation failed', { error: validation.error });
+  // Graceful fallback
+}
+```
+
+**Error Messages**: Detailed path + error description (e.g., "decision.confidence: Expected number, received undefined")
+**Module**: `src/lib/llm/schemas.ts`
+
+#### ✅ 11. Observability / Structured Logging (v1.3)
+Structured logging with context for observability:
+- **Consistent format**: `[timestamp] [LEVEL] message (duration) {context}`
+- **Agent-specific logger**: `createAgentLogger(agentId)` with bound context
+- **Trading helpers**: cycleStart/End, analysisResult, decisionReceived, tradeExecuted
+- **Timing utilities**: `timed()` for async operations, `createTimer()` for manual timing
+- **In-memory metrics**: Cycles, trades, LLM calls, costs, risk blocks
+
+**Metrics Tracked**:
+```typescript
+agentMetrics.getMetrics();
+// {
+//   executionCycles: 42,
+//   tradesExecuted: 15,
+//   tradesFailed: 2,
+//   llmCalls: 84,
+//   llmTotalCost: 2.05,
+//   llmAvgLatencyMs: 1850,
+//   riskBlocks: 3,
+//   emergencyStops: 0,
+//   tradeSuccessRate: 88
+// }
+```
+
+**Module**: `src/lib/agent/logger.ts`
+**Executor**: Structured logging throughout execution cycle
+
 ### Medium Priority
 
-#### 8. Multi-Timeframe Analysis
+#### 12. Multi-Timeframe Analysis
 Currently uses 1h candles only. Add:
 - 15m for entry timing
 - 4h for trend confirmation
 - 1D for major S/R levels
 
-#### 9. Sentiment Data Integration
+#### 13. Sentiment Data Integration
 Add external data sources:
 - Fear & Greed Index
 - Social sentiment (Twitter, Reddit)
 - Funding rate trends
 - Liquidation data
 
-#### 10. Portfolio-Level Risk Management
+#### 14. Portfolio-Level Risk Management
 Currently per-position. Add:
 - Total portfolio exposure limits
 - Correlation-aware sizing
 - Sector concentration limits
 
-#### 11. Backtesting Engine
+#### 15. Backtesting Engine
 Simulate agent performance on historical data:
 - Test strategy changes before deploying
 - Optimize parameters
@@ -1109,41 +1377,24 @@ Simulate agent performance on historical data:
 
 ### Lower Priority
 
-#### 12. Agent Evolution (Genetic Algorithms)
+#### 16. Agent Evolution (Genetic Algorithms)
 Use `agent_genomes` table for:
 - Mutation of successful strategies
 - Crossover between top performers
 - Tournament selection
 
-#### 13. Real-Time Execution
+#### 17. Real-Time Execution
 Currently interval-based. Add:
 - WebSocket price streaming
 - Event-triggered execution
 - Faster response to market moves
 
-#### 14. Order Type Expansion
+#### 18. Order Type Expansion
 Currently market orders only. Add:
 - Limit orders with patience
 - Stop-limit entries
 - Scaled entry/exit
 - TWAP for large positions
-
-#### 15. Market Regime Detection
-Classify market conditions before making decisions:
-- TRENDING_UP: Clear uptrend, buy dips
-- TRENDING_DOWN: Clear downtrend, sell rallies
-- RANGING: Sideways, mean reversion works
-- HIGH_VOLATILITY: Choppy, reduce size
-- LOW_VOLATILITY: Quiet, breakout possible
-
-This affects how the agent should trade (different strategies per regime).
-
-#### 16. Recent Trade History in Prompt
-Include recent trades for context to prevent revenge trading:
-- Last N trades with entry/exit prices
-- P&L results
-- Prevents overtrading same setup
-- LLM considers recent context when deciding
 
 ---
 
@@ -1160,9 +1411,12 @@ Include recent trades for context to prevent revenge trading:
 | `src/lib/agent/technical-analysis.ts` | Technical indicators |
 | `src/lib/agent/performance-stats.ts` | Performance metrics calculation |
 | `src/lib/agent/risk-management.ts` | Risk guardrails (dedup, limits, emergency stop) |
+| `src/lib/agent/market-regime.ts` | Market regime detection (v1.3) |
+| `src/lib/agent/logger.ts` | Structured logging and metrics (v1.3) |
 | `src/lib/agent/index.ts` | Module exports |
 | `src/lib/llm/index.ts` | LLM provider integration |
-| `src/lib/llm/prompts.ts` | Trading prompt templates |
+| `src/lib/llm/prompts.ts` | Trading prompt templates (with recent trades) |
+| `src/lib/llm/schemas.ts` | Zod schemas for LLM response validation (v1.3) |
 | `src/lib/hyperliquid/` | Exchange integration |
 | `src/lib/db/schema.ts` | Database schema |
 | `src/app/api/agents/[id]/stats/route.ts` | Performance stats API |
@@ -1174,9 +1428,31 @@ Include recent trades for context to prevent revenge trading:
 ---
 
 *Last Updated: December 2024*
-*Version: 1.2*
+*Version: 1.3*
 
 ### Changelog
+
+**v1.3** (December 2024)
+- Added Market Regime Detection module (`market-regime.ts`)
+  - Classifies market as TRENDING_UP/DOWN, RANGING, HIGH/LOW_VOLATILITY
+  - Uses RSI, MACD, EMAs, Bollinger Bands, ATR, volume
+  - Returns risk multiplier for position sizing
+  - Integrated into LLM prompts for context-aware decisions
+- Added Recent Trade History in Prompts
+  - `buildAgentContext()` now fetches recent closed trades from DB
+  - Last 5 trades with P&L included in prompt
+  - Helps prevent revenge trading and overtrading
+- Added Type Safety for LLM Responses (`schemas.ts`)
+  - Zod schemas: TradingDecision, MarketAnalysis, PositionManagement, RiskAssessment
+  - Validation functions with detailed error messages
+  - Graceful fallbacks when validation fails
+- Added Structured Logging module (`logger.ts`)
+  - Consistent log format with timestamps and context
+  - Agent-specific logger with trading helpers
+  - Timing utilities (`timed`, `createTimer`)
+  - In-memory metrics collection
+- Executor now uses Zod validation for all LLM responses
+- Executor logs structured events throughout execution cycle
 
 **v1.2** (December 2024)
 - Added Performance Statistics module (`performance-stats.ts`)
