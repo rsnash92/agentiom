@@ -136,12 +136,37 @@ export const agents = pgTable('agents', {
     maxDrawdownPct: number;
     approvedPairs: string[];
     tradingHours?: { start: number; end: number };
+    // Position sizing strategy
+    positionSizing?: {
+      strategy: 'fixed_fractional' | 'kelly_criterion' | 'volatility_adjusted' | 'risk_per_trade';
+      maxRiskPerTrade?: number;
+      kellyFraction?: number;
+      volatilityMultiplier?: number;
+    };
+    // Trailing stop configuration
+    trailingStop?: {
+      enabled: boolean;
+      type: 'percentage' | 'atr' | 'step' | 'breakeven';
+      trailPercent?: number;
+      atrMultiplier?: number;
+      stepPercent?: number;
+      stepGain?: number;
+      breakevenTriggerPercent?: number;
+    };
   }>().default({
     maxLeverage: 10,
     maxPositionSizeUsd: 1000,
     maxPositionSizePct: 10,
     maxDrawdownPct: 20,
     approvedPairs: ['BTC', 'ETH'],
+    positionSizing: {
+      strategy: 'fixed_fractional',
+    },
+    trailingStop: {
+      enabled: true,
+      type: 'percentage',
+      trailPercent: 2,
+    },
   }),
 
   // LLM Configuration
@@ -244,6 +269,9 @@ export const positions = pgTable('positions', {
   realizedPnl: numeric('realized_pnl').default('0'),
   takeProfit: numeric('take_profit'),
   stopLoss: numeric('stop_loss'),
+  // Trailing stop tracking
+  highWaterMark: numeric('high_water_mark'),
+  lowWaterMark: numeric('low_water_mark'),
   status: text('status').default('open').notNull(), // 'open' | 'closed'
   entryReasoning: text('entry_reasoning'),
   exitReasoning: text('exit_reasoning'),

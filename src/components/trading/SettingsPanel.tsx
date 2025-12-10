@@ -5,6 +5,84 @@ import { ModelSelector } from '@/components/agent';
 import { AgentLLMConfig, DEFAULT_LLM_CONFIG } from '@/lib/llm/types';
 import { useAuth } from '@/lib/hooks';
 
+// Position sizing strategy definitions
+const POSITION_SIZING_STRATEGIES = [
+  {
+    id: 'fixed_fractional',
+    name: 'Fixed Percentage',
+    description: 'Risk a fixed % of account per trade',
+    icon: '📊',
+  },
+  {
+    id: 'kelly_criterion',
+    name: 'Kelly Criterion',
+    description: 'Optimize for long-term growth based on win rate',
+    icon: '📈',
+  },
+  {
+    id: 'volatility_adjusted',
+    name: 'Volatility-Adjusted',
+    description: 'Smaller positions in volatile markets',
+    icon: '🌊',
+  },
+  {
+    id: 'risk_per_trade',
+    name: 'Fixed Risk',
+    description: 'Risk $X per trade regardless of setup',
+    icon: '🎯',
+  },
+] as const;
+
+// Trailing stop type definitions
+const TRAILING_STOP_TYPES = [
+  {
+    id: 'percentage',
+    name: 'Percentage',
+    description: 'Trail by a fixed percentage',
+  },
+  {
+    id: 'atr',
+    name: 'ATR-Based',
+    description: 'Trail by multiple of ATR (volatility-adaptive)',
+  },
+  {
+    id: 'step',
+    name: 'Step',
+    description: 'Move stop in increments at gain thresholds',
+  },
+  {
+    id: 'breakeven',
+    name: 'Breakeven',
+    description: 'Move to breakeven after profit threshold',
+  },
+] as const;
+
+type PositionSizingStrategy = typeof POSITION_SIZING_STRATEGIES[number]['id'];
+type TrailingStopType = typeof TRAILING_STOP_TYPES[number]['id'];
+
+interface TradingConfig {
+  positionSizing: {
+    strategy: PositionSizingStrategy;
+    maxRiskPerTrade?: number;
+    kellyFraction?: number;
+    volatilityMultiplier?: number;
+  };
+  trailingStop: {
+    enabled: boolean;
+    type: TrailingStopType;
+    trailPercent?: number;
+    atrMultiplier?: number;
+    stepPercent?: number;
+    stepGain?: number;
+    breakevenTriggerPercent?: number;
+  };
+}
+
+const DEFAULT_TRADING_CONFIG: TradingConfig = {
+  positionSizing: { strategy: 'fixed_fractional' },
+  trailingStop: { enabled: true, type: 'percentage', trailPercent: 2 },
+};
+
 interface SettingsPanelProps {
   agentName?: string;
   agentId?: string;
@@ -33,6 +111,8 @@ export function SettingsPanel({
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [llmConfig, setLlmConfig] = useState<AgentLLMConfig>(DEFAULT_LLM_CONFIG);
   const [savingConfig, setSavingConfig] = useState(false);
+  const [tradingConfig, setTradingConfig] = useState<TradingConfig>(DEFAULT_TRADING_CONFIG);
+  const [savingTradingConfig, setSavingTradingConfig] = useState(false);
   const { getAccessToken } = useAuth();
 
   const isEligibleForCredits = cdxBalance >= 100000;
@@ -60,6 +140,31 @@ export function SettingsPanel({
     fetchConfig();
   }, [agentId, getAccessToken]);
 
+  // Fetch trading config when agentId changes
+  useEffect(() => {
+    if (!agentId) return;
+
+    async function fetchTradingConfig() {
+      try {
+        const token = await getAccessToken();
+        const res = await fetch(`/api/agents/${agentId}/trading-config`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setTradingConfig({
+            positionSizing: data.positionSizing || DEFAULT_TRADING_CONFIG.positionSizing,
+            trailingStop: data.trailingStop || DEFAULT_TRADING_CONFIG.trailingStop,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch trading config:', error);
+      }
+    }
+
+    fetchTradingConfig();
+  }, [agentId, getAccessToken]);
+
   // Save LLM config
   const handleLLMConfigChange = async (newConfig: AgentLLMConfig) => {
     setLlmConfig(newConfig);
@@ -81,6 +186,34 @@ export function SettingsPanel({
       console.error('Failed to save LLM config:', error);
     } finally {
       setSavingConfig(false);
+    }
+  };
+
+  // Save trading config
+  const handleTradingConfigChange = async (updates: Partial<TradingConfig>) => {
+    const newConfig = {
+      ...tradingConfig,
+      ...updates,
+    };
+    setTradingConfig(newConfig);
+
+    if (!agentId) return;
+
+    setSavingTradingConfig(true);
+    try {
+      const token = await getAccessToken();
+      await fetch(`/api/agents/${agentId}/trading-config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updates),
+      });
+    } catch (error) {
+      console.error('Failed to save trading config:', error);
+    } finally {
+      setSavingTradingConfig(false);
     }
   };
 
@@ -305,13 +438,184 @@ export function SettingsPanel({
           onToggle={() => toggleSection('thinking')}
         />
 
-        <SettingsSection
-          icon={<TrendUpIcon className="w-5 h-5 text-success" />}
-          title="Trading Config"
-          description="Exchange, trading philosophy and risk management"
-          expanded={expandedSection === 'trading'}
-          onToggle={() => toggleSection('trading')}
-        />
+        {/* Trading Config Section - Custom with dropdowns */}
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <button
+            onClick={() => toggleSection('trading')}
+            className="w-full flex items-center gap-3 p-4 hover:bg-background/50 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center flex-shrink-0">
+              <TrendUpIcon className="w-5 h-5 text-success" />
+            </div>
+            <div className="flex-1 text-left">
+              <h4 className="text-sm font-semibold">Trading Config</h4>
+              <p className="text-xs text-foreground-muted">Position sizing and risk management</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {savingTradingConfig && (
+                <span className="text-xs text-foreground-muted">Saving...</span>
+              )}
+              <ChevronIcon className={`w-5 h-5 text-foreground-muted transition-transform ${expandedSection === 'trading' ? 'rotate-180' : ''}`} />
+            </div>
+          </button>
+          {expandedSection === 'trading' && (
+            <div className="px-4 pb-4 border-t border-border">
+              <div className="pt-4 space-y-4">
+                {/* Position Sizing Strategy */}
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-2">
+                    Position Sizing Strategy
+                  </label>
+                  <select
+                    value={tradingConfig.positionSizing.strategy}
+                    onChange={(e) => handleTradingConfigChange({
+                      positionSizing: {
+                        ...tradingConfig.positionSizing,
+                        strategy: e.target.value as PositionSizingStrategy,
+                      },
+                    })}
+                    disabled={savingTradingConfig}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+                  >
+                    {POSITION_SIZING_STRATEGIES.map((strategy) => (
+                      <option key={strategy.id} value={strategy.id}>
+                        {strategy.icon} {strategy.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1.5 text-xs text-foreground-muted">
+                    {POSITION_SIZING_STRATEGIES.find(s => s.id === tradingConfig.positionSizing.strategy)?.description}
+                  </p>
+                </div>
+
+                {/* Trailing Stop Configuration */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-foreground">
+                      Trailing Stop
+                    </label>
+                    <button
+                      onClick={() => handleTradingConfigChange({
+                        trailingStop: {
+                          ...tradingConfig.trailingStop,
+                          enabled: !tradingConfig.trailingStop.enabled,
+                        },
+                      })}
+                      disabled={savingTradingConfig}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        tradingConfig.trailingStop.enabled ? 'bg-success' : 'bg-border'
+                      } disabled:opacity-50`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                          tradingConfig.trailingStop.enabled ? 'translate-x-4.5' : 'translate-x-1'
+                        }`}
+                        style={{ transform: tradingConfig.trailingStop.enabled ? 'translateX(18px)' : 'translateX(2px)' }}
+                      />
+                    </button>
+                  </div>
+
+                  {tradingConfig.trailingStop.enabled && (
+                    <div className="space-y-3">
+                      <select
+                        value={tradingConfig.trailingStop.type}
+                        onChange={(e) => handleTradingConfigChange({
+                          trailingStop: {
+                            ...tradingConfig.trailingStop,
+                            type: e.target.value as TrailingStopType,
+                          },
+                        })}
+                        disabled={savingTradingConfig}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+                      >
+                        {TRAILING_STOP_TYPES.map((type) => (
+                          <option key={type.id} value={type.id}>
+                            {type.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-foreground-muted">
+                        {TRAILING_STOP_TYPES.find(t => t.id === tradingConfig.trailingStop.type)?.description}
+                      </p>
+
+                      {/* Trail Percent for percentage type */}
+                      {tradingConfig.trailingStop.type === 'percentage' && (
+                        <div>
+                          <label className="block text-xs text-foreground-muted mb-1">
+                            Trail Percent (%)
+                          </label>
+                          <input
+                            type="number"
+                            min="0.5"
+                            max="10"
+                            step="0.5"
+                            value={tradingConfig.trailingStop.trailPercent || 2}
+                            onChange={(e) => handleTradingConfigChange({
+                              trailingStop: {
+                                ...tradingConfig.trailingStop,
+                                trailPercent: parseFloat(e.target.value),
+                              },
+                            })}
+                            disabled={savingTradingConfig}
+                            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+                          />
+                        </div>
+                      )}
+
+                      {/* ATR Multiplier for atr type */}
+                      {tradingConfig.trailingStop.type === 'atr' && (
+                        <div>
+                          <label className="block text-xs text-foreground-muted mb-1">
+                            ATR Multiplier
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="5"
+                            step="0.5"
+                            value={tradingConfig.trailingStop.atrMultiplier || 2}
+                            onChange={(e) => handleTradingConfigChange({
+                              trailingStop: {
+                                ...tradingConfig.trailingStop,
+                                atrMultiplier: parseFloat(e.target.value),
+                              },
+                            })}
+                            disabled={savingTradingConfig}
+                            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+                          />
+                        </div>
+                      )}
+
+                      {/* Breakeven trigger for breakeven type */}
+                      {tradingConfig.trailingStop.type === 'breakeven' && (
+                        <div>
+                          <label className="block text-xs text-foreground-muted mb-1">
+                            Breakeven Trigger (%)
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="10"
+                            step="0.5"
+                            value={tradingConfig.trailingStop.breakevenTriggerPercent || 2}
+                            onChange={(e) => handleTradingConfigChange({
+                              trailingStop: {
+                                ...tradingConfig.trailingStop,
+                                breakevenTriggerPercent: parseFloat(e.target.value),
+                              },
+                            })}
+                            disabled={savingTradingConfig}
+                            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

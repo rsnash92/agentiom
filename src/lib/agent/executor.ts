@@ -1,15 +1,17 @@
 /**
  * Agent Executor
  * Runs the autonomous trading loop for an agent:
- * 1. Gather market data
+ * 1. Gather market data with technical analysis
  * 2. Analyze with LLM based on personality/strategy
- * 3. Make trading decision
- * 4. Execute trades within policy limits
+ * 3. Calculate optimal position size
+ * 4. Make trading decision with stop-loss/take-profit
+ * 5. Execute trades with retry/circuit breaker protection
+ * 6. Monitor positions with trailing stops
  */
 
 import { db } from '@/lib/db';
 import { agents, agentLogs, llmUsage, balanceSnapshots, positions } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { decryptPrivateKey } from '@/lib/crypto';
 import { createServerTrader, hyperliquid } from '@/lib/hyperliquid';
 import {
@@ -36,6 +38,31 @@ import {
   PositionContext,
 } from '@/lib/llm/prompts';
 import type { Hex } from 'viem';
+
+// New modules
+import {
+  calculatePositionSize,
+  calculateTradeStatistics,
+  PositionSizingConfig,
+  PositionSizingStrategy,
+} from './position-sizing';
+import {
+  calculateTrailingStop,
+  updateWaterMarks,
+  TrailingStopConfig,
+  TrailingStopType,
+} from './trailing-stop';
+import {
+  withResilience,
+  getCircuitStatus,
+} from './resilience';
+import {
+  calculateIndicators,
+  calculateSupportResistance,
+  formatIndicatorsForPrompt,
+  type Candle,
+} from './technical-analysis';
+import type { CandleData } from '@/lib/hyperliquid';
 
 // Types
 interface AgentConfig {
@@ -65,6 +92,10 @@ interface MarketData {
   funding: number;
   openInterest: number;
   volume24h: number;
+  // Enhanced with technical analysis
+  candles?: CandleData[];
+  technicalIndicators?: ReturnType<typeof calculateIndicators>;
+  supportResistance?: ReturnType<typeof calculateSupportResistance>;
 }
 
 interface TradingDecision {
@@ -172,25 +203,53 @@ export async function executeAgentCycle(agentId: string): Promise<ExecutionResul
       `Positions: ${accountState.positions.length}`
     );
 
-    // 4. Gather market data for approved pairs
+    // 4. Gather market data for approved pairs with technical analysis
     const marketData: MarketData[] = [];
     for (const coin of config.policies.approvedPairs) {
-      const data = await hyperliquid.getMarketData(coin);
+      // Use resilience wrapper for API calls
+      const data = await withResilience(
+        `hyperliquid.${coin}`,
+        () => hyperliquid.getMarketData(coin),
+        { retry: { maxRetries: 2 }, circuit: { failureThreshold: 3 } }
+      ).catch(() => null);
+
       if (data) {
-        marketData.push({
+        const market: MarketData = {
           coin,
           price: data.markPx,
           priceChange24h: data.priceChangePct24h,
           funding: data.funding,
           openInterest: data.openInterest,
           volume24h: data.volume24h,
-        });
+        };
+
+        // Fetch candle data for technical analysis
+        try {
+          const candles = await withResilience(
+            `hyperliquid.candles.${coin}`,
+            () => hyperliquid.getCandles(coin, '1h', 100),
+            { retry: { maxRetries: 1 } }
+          ).catch(() => null);
+
+          if (candles && candles.length > 0) {
+            market.candles = candles;
+            market.technicalIndicators = calculateIndicators(candles);
+            market.supportResistance = calculateSupportResistance(candles);
+          }
+        } catch (candleError) {
+          console.log(`Could not fetch candles for ${coin}:`, candleError);
+        }
+
+        marketData.push(market);
       }
     }
 
     await logAgentThinking(agentId,
       `Analyzing ${marketData.length} markets: ${marketData.map(m => m.coin).join(', ')}`
     );
+
+    // 4b. Check and update trailing stops for open positions
+    await checkAndUpdateTrailingStops(agentId, accountState.positions, marketData);
 
     // 5. Build agent context for LLM
     const agentContext = buildAgentContext(config, accountState);
@@ -799,4 +858,177 @@ async function logAgentError(agentId: string, error: string) {
     logType: 'error',
     content: error,
   });
+}
+
+/**
+ * Check and update trailing stops for open positions
+ */
+async function checkAndUpdateTrailingStops(
+  agentId: string,
+  openPositions: Array<{
+    coin: string;
+    side: 'long' | 'short';
+    size: number;
+    entryPrice: number;
+    markPrice: number;
+    unrealizedPnl: number;
+    leverage: number;
+  }>,
+  marketData: MarketData[]
+): Promise<void> {
+  for (const position of openPositions) {
+    const market = marketData.find(m => m.coin === position.coin);
+    if (!market) continue;
+
+    const unrealizedPnlPercent = ((position.markPrice - position.entryPrice) / position.entryPrice) * 100 *
+      (position.side === 'long' ? 1 : -1);
+
+    // Get position from DB to access high/low water marks
+    const [dbPosition] = await db
+      .select()
+      .from(positions)
+      .where(and(
+        eq(positions.agentId, agentId),
+        eq(positions.symbol, position.coin),
+        eq(positions.status, 'open')
+      ))
+      .limit(1);
+
+    if (!dbPosition) continue;
+
+    // Update water marks
+    const waterMarks = updateWaterMarks(
+      {
+        highWaterMark: dbPosition.highWaterMark ? parseFloat(dbPosition.highWaterMark) : undefined,
+        lowWaterMark: dbPosition.lowWaterMark ? parseFloat(dbPosition.lowWaterMark) : undefined,
+      },
+      position.side,
+      market.price,
+      position.entryPrice
+    );
+
+    // Calculate new trailing stop
+    const trailingResult = calculateTrailingStop(
+      {
+        side: position.side,
+        entryPrice: position.entryPrice,
+        currentPrice: market.price,
+        currentStopLoss: dbPosition.stopLoss ? parseFloat(dbPosition.stopLoss) : undefined,
+        highWaterMark: waterMarks.highWaterMark,
+        lowWaterMark: waterMarks.lowWaterMark,
+        atr: market.technicalIndicators?.atr14 || undefined,
+        unrealizedPnlPercent,
+      },
+      { type: 'percentage', trailPercent: 2, lockProfitPercent: 5, lockProfitTrailPercent: 1 }
+    );
+
+    // Update position with new stop loss and water marks
+    await db
+      .update(positions)
+      .set({
+        stopLoss: trailingResult.newStopLoss.toString(),
+        highWaterMark: waterMarks.highWaterMark.toString(),
+        lowWaterMark: waterMarks.lowWaterMark.toString(),
+      })
+      .where(eq(positions.id, dbPosition.id));
+
+    // If trailing stop triggered, close position
+    if (trailingResult.triggered) {
+      await logAgentThinking(agentId, `[TRAILING STOP] ${trailingResult.reason}`);
+      await simulateClosePosition(agentId, position.coin, trailingResult.reason);
+    } else if (trailingResult.profitLocked !== undefined && trailingResult.profitLocked > 0) {
+      await logAgentThinking(agentId,
+        `[TRAILING STOP] ${position.coin}: ${trailingResult.reason} (${trailingResult.profitLocked.toFixed(2)}% profit locked)`
+      );
+    }
+  }
+}
+
+/**
+ * Calculate position size using dynamic sizing strategies
+ */
+async function calculateOptimalPositionSize(
+  agentId: string,
+  config: AgentConfig,
+  accountState: { accountValue: number; freeCollateral: number },
+  market: MarketData,
+  decision: TradingDecision
+): Promise<{ sizeUsd: number; sizeAsset: number; reasoning: string }> {
+  // Get historical trade stats for Kelly criterion
+  const closedTrades = await db
+    .select({
+      realizedPnl: positions.realizedPnl,
+      entryPrice: positions.entryPrice,
+      size: positions.size,
+    })
+    .from(positions)
+    .where(and(
+      eq(positions.agentId, agentId),
+      eq(positions.status, 'closed')
+    ))
+    .orderBy(desc(positions.closedAt))
+    .limit(50);
+
+  const trades = closedTrades.map(t => ({
+    pnl: parseFloat(t.realizedPnl || '0'),
+    pnlPercent: (parseFloat(t.realizedPnl || '0') / (parseFloat(t.size) * parseFloat(t.entryPrice))) * 100,
+  }));
+
+  const stats = calculateTradeStatistics(trades);
+
+  // Calculate position size
+  const result = calculatePositionSize(
+    {
+      accountValue: accountState.accountValue,
+      freeCollateral: accountState.freeCollateral,
+      currentPrice: market.price,
+      stopLossPercent: decision.stopLoss
+        ? Math.abs((market.price - decision.stopLoss) / market.price * 100)
+        : 3,
+      volatility24h: Math.abs(market.priceChange24h),
+      atr: market.technicalIndicators?.atr14 || undefined,
+      winRate: stats.winRate,
+      avgWinLossRatio: stats.avgWinLossRatio,
+      confidence: decision.confidence,
+      leverage: decision.leverage || 1,
+      maxPositionSizeUsd: config.policies.maxPositionSizeUsd,
+    },
+    {
+      strategy: config.isDemo ? 'fixed_fractional' : 'volatility_adjusted',
+      maxAccountPercent: config.policies.maxPositionSizePct,
+      kellyFraction: 0.25,
+    }
+  );
+
+  return {
+    sizeUsd: result.sizeUsd,
+    sizeAsset: result.sizeAsset,
+    reasoning: result.reasoning,
+  };
+}
+
+/**
+ * Get enhanced technical analysis summary for LLM prompt
+ */
+function getTechnicalAnalysisSummary(market: MarketData): string {
+  if (!market.technicalIndicators) {
+    return 'Technical analysis unavailable';
+  }
+
+  let summary = formatIndicatorsForPrompt(market.technicalIndicators);
+
+  if (market.supportResistance) {
+    const sr = market.supportResistance;
+    if (sr.nearestSupport || sr.nearestResistance) {
+      summary += '\n- Key Levels:';
+      if (sr.nearestSupport) {
+        summary += ` Support=$${sr.nearestSupport.toFixed(2)}`;
+      }
+      if (sr.nearestResistance) {
+        summary += ` Resistance=$${sr.nearestResistance.toFixed(2)}`;
+      }
+    }
+  }
+
+  return summary;
 }
