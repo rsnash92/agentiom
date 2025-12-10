@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { TerminalPanel, TabbedSettingsPanel, AgentPerformanceChart, AgentInfoCard } from '@/components/trading';
@@ -19,10 +19,20 @@ function AgentTradingPageContent() {
   const agentId = pathId || queryId || null;
 
   // Fetch the current agent's data
-  const { agent, isLoading: agentLoading, error: agentError, toggleStatus } = useAgent(agentId);
+  const { agent, isLoading: agentLoading, error: agentError, toggleStatus, fetchAgent } = useAgent(agentId);
 
   // Fetch all agents for the switcher
-  const { agents: allAgents } = useAgents();
+  const { agents: allAgents, fetchAgents } = useAgents();
+
+  // Handle status toggle with UI refresh
+  const handleToggleStatus = useCallback(async () => {
+    const result = await toggleStatus();
+    if (result) {
+      // Refresh both current agent and all agents list to update UI everywhere
+      await Promise.all([fetchAgent(), fetchAgents()]);
+    }
+    return result;
+  }, [toggleStatus, fetchAgent, fetchAgents]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSetupChecklist, setShowSetupChecklist] = useState(false);
@@ -87,7 +97,7 @@ function AgentTradingPageContent() {
 
   // Handle agent activation from checklist
   const handleActivateFromChecklist = async () => {
-    await toggleStatus();
+    await handleToggleStatus();
     setShowSetupChecklist(false);
     setChecklistDismissed(true);
   };
@@ -127,7 +137,7 @@ function AgentTradingPageContent() {
           balance={agentBalance}
           status={agent.status as 'active' | 'paused'}
           isDemo={agent.isDemo}
-          onToggleStatus={toggleStatus}
+          onToggleStatus={handleToggleStatus}
           otherAgents={allAgents.map(a => ({ id: a.id, name: a.name, status: a.status, isDemo: a.isDemo, balance: parseFloat(a.demoBalance || '5000') }))}
           onSelectAgent={(id) => router.push(`/agents/${id}`)}
         />
@@ -157,7 +167,13 @@ function AgentTradingPageContent() {
 
       {/* Right Panel - Tabbed Settings (Trade & Agent tabs) */}
       <div className="w-full lg:w-[320px] panel flex flex-col overflow-hidden">
-        <TabbedSettingsPanel agentId={agent.id} />
+        <TabbedSettingsPanel
+          agentId={agent.id}
+          onStatusChange={async () => {
+            // Refresh agent data to update UI
+            await Promise.all([fetchAgent(), fetchAgents()]);
+          }}
+        />
       </div>
     </div>
   );

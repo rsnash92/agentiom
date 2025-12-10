@@ -159,6 +159,7 @@ export async function GET(
     }
 
     let dataPoints: { timestamp: number; value: number }[] = [];
+    const agentCreatedAt = new Date(agent.createdAt).getTime();
 
     if (snapshots.length > 0) {
       // Use stored snapshots
@@ -166,6 +167,14 @@ export async function GET(
         timestamp: new Date(s.timestamp).getTime(),
         value: parseFloat(s.balance) + parseFloat(s.unrealizedPnl || '0'),
       }));
+
+      // Ensure we have the initial baseline at creation time
+      if (dataPoints.length > 0 && dataPoints[0].timestamp > agentCreatedAt) {
+        dataPoints.unshift({
+          timestamp: agentCreatedAt,
+          value: initialBalance,
+        });
+      }
     } else {
       // Fall back to generating from positions
       const closedPositions = await db
@@ -177,15 +186,13 @@ export async function GET(
         ))
         .orderBy(desc(positions.closedAt));
 
-      // Only generate chart data if there are actual closed positions
-      if (closedPositions.length > 0) {
-        // Start with initial balance at agent creation
-        const agentCreatedAt = new Date(agent.createdAt).getTime();
-        dataPoints.push({
-          timestamp: agentCreatedAt,
-          value: initialBalance,
-        });
+      // Always start with initial balance at agent creation
+      dataPoints.push({
+        timestamp: agentCreatedAt,
+        value: initialBalance,
+      });
 
+      if (closedPositions.length > 0) {
         // Add data points for each closed position
         let runningBalance = initialBalance;
         const sortedPositions = [...closedPositions].reverse();
@@ -202,7 +209,6 @@ export async function GET(
           }
         }
       }
-      // If no closed positions, dataPoints stays empty and chart will show empty state
     }
 
     // Calculate unrealized P&L from open positions
@@ -219,19 +225,19 @@ export async function GET(
       unrealizedPnl += parseFloat(pos.unrealizedPnl || '0');
     }
 
-    // Get the actual current balance from the latest data point
-    // If we have snapshots, use the latest; otherwise use demoBalance
+    // Get the actual current balance from the latest data point or demoBalance
+    // For new agents with no trading, use demoBalance; otherwise use last snapshot
     let actualCurrentBalance = currentBalance;
-    if (dataPoints.length > 0) {
-      // Use the last data point value as the current balance
+    if (dataPoints.length > 1) {
+      // More than just the initial point - use the last data point value
       actualCurrentBalance = dataPoints[dataPoints.length - 1].value;
-
-      // Add current point with unrealized P&L factored in (only if we have trading history)
-      dataPoints.push({
-        timestamp: Date.now(),
-        value: actualCurrentBalance + unrealizedPnl,
-      });
     }
+
+    // Always add current point to show current state
+    dataPoints.push({
+      timestamp: Date.now(),
+      value: actualCurrentBalance + unrealizedPnl,
+    });
 
     // Interpolate to get smooth chart data (returns empty array if no data points)
     const smoothDataPoints = interpolateDataPoints(dataPoints, 100);

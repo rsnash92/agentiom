@@ -5,6 +5,7 @@ import { useAgent, useAuth } from '@/lib/hooks';
 
 interface TabbedSettingsPanelProps {
   agentId: string;
+  onStatusChange?: () => Promise<void>; // Callback after status changes
 }
 
 const SYMBOLS = [
@@ -44,7 +45,7 @@ const LLM_MODELS = [
 type PositionSizingStrategy = typeof POSITION_SIZING_STRATEGIES[number]['id'];
 type StopLossType = typeof STOP_LOSS_TYPES[number]['id'];
 
-export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
+export function TabbedSettingsPanel({ agentId, onStatusChange }: TabbedSettingsPanelProps) {
   const { agent, updateAgent, executeOnce, toggleStatus } = useAgent(agentId);
   const { getAccessToken } = useAuth();
   const [isToggling, setIsToggling] = useState(false);
@@ -170,6 +171,8 @@ export function TabbedSettingsPanel({ agentId }: TabbedSettingsPanelProps) {
     setIsToggling(true);
     try {
       await toggleStatus();
+      // Notify parent to refresh UI
+      await onStatusChange?.();
     } finally {
       setIsToggling(false);
     }
