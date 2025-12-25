@@ -2,13 +2,53 @@ import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
 import { createLogger } from '@agentiom/logger';
+import { createDatabase } from '@agentiom/db';
+import { isAgentiomError } from '@agentiom/shared';
+import { AuthService } from './services/auth.service';
+import { createAuthRoutes } from './routes/auth';
 
 const log = createLogger('api');
+
+// Environment validation
+const DATABASE_URL = process.env.DATABASE_URL ?? 'file:local.db';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  log.error('JWT_SECRET environment variable is required');
+  process.exit(1);
+}
+
+// Initialize database
+const db = createDatabase(DATABASE_URL);
+
+// Initialize services
+const authService = new AuthService(db, JWT_SECRET);
+
+// Create app
 const app = new Hono();
 
-// Middleware
+// Global middleware
 app.use('*', logger());
 app.use('*', cors());
+
+// Global error handler
+app.onError((err, c) => {
+  if (isAgentiomError(err)) {
+    log.warn({ error: err.toJSON(), path: c.req.path }, 'Request error');
+    return c.json(err.toJSON(), err.statusCode as 400 | 401 | 403 | 404 | 409 | 429 | 500 | 502);
+  }
+
+  log.error({ error: err.message, stack: err.stack, path: c.req.path }, 'Unhandled error');
+  return c.json(
+    {
+      error: {
+        code: 'internal_error',
+        message: 'An unexpected error occurred',
+      },
+    },
+    500
+  );
+});
 
 // Health check endpoint
 app.get('/health', (c) => {
@@ -27,6 +67,9 @@ app.get('/', (c) => {
     docs: '/docs',
   });
 });
+
+// Mount routes
+app.route('/auth', createAuthRoutes(authService));
 
 log.info('API running on http://localhost:3000');
 
