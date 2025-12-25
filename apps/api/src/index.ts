@@ -5,7 +5,10 @@ import { createLogger } from '@agentiom/logger';
 import { createDatabase } from '@agentiom/db';
 import { isAgentiomError } from '@agentiom/shared';
 import { AuthService } from './services/auth.service';
+import { AgentService } from './services/agent.service';
+import { DeployService } from './services/deploy.service';
 import { createAuthRoutes } from './routes/auth';
+import { createAgentRoutes } from './routes/agents';
 
 const log = createLogger('api');
 
@@ -23,6 +26,8 @@ const db = createDatabase(DATABASE_URL);
 
 // Initialize services
 const authService = new AuthService(db, JWT_SECRET);
+const agentService = new AgentService(db);
+const deployService = new DeployService(db); // Uses mock providers by default
 
 // Create app
 const app = new Hono();
@@ -70,6 +75,7 @@ app.get('/', (c) => {
 
 // Mount routes
 app.route('/auth', createAuthRoutes(authService));
+app.route('/agents', createAgentRoutes(agentService, deployService, authService));
 
 log.info('API running on http://localhost:3000');
 
