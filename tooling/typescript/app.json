@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Application",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["bun-types"]
+  }
+}

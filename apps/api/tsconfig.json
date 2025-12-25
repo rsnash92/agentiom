@@ -1,0 +1,5 @@
+{
+  "extends": "@agentiom/typescript-config/app.json",
+  "include": ["src"],
+  "exclude": ["node_modules"]
+}

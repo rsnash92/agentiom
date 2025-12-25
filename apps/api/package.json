@@ -1,0 +1,24 @@
+{
+  "name": "@agentiom/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "@agentiom/shared": "workspace:*",
+    "@agentiom/db": "workspace:*",
+    "@agentiom/providers": "workspace:*",
+    "@agentiom/logger": "workspace:*"
+  },
+  "devDependencies": {
+    "@agentiom/typescript-config": "workspace:*",
+    "@types/bun": "latest",
+    "typescript": "^5.7.2"
+  }
+}
