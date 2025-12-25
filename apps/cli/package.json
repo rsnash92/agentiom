@@ -1,0 +1,26 @@
+{
+  "name": "@agentiom/cli",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agentiom": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target node",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1",
+    "ora": "^8.1.1",
+    "yaml": "^2.6.1",
+    "@agentiom/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@agentiom/typescript-config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}
