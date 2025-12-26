@@ -5,3 +5,7 @@ export { StatCard } from './stat-card';
 export { CommandCard } from './command-card';
 export { EmptyState } from './empty-state';
 export { AgentRow } from './agent-row';
+export { PixelBackground } from './pixel-background';
+export { CornerBorderBox } from './corner-border-box';
+export { AnimatedTerminal } from './animated-terminal';
+export { LandingPage } from './landing-page';

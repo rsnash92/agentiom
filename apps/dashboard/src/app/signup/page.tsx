@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
+import { PixelBackground } from '@/components';
 
 export default function SignupPage() {
   const { register } = useAuth();
@@ -38,25 +40,34 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+    <div className="relative min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
+      <PixelBackground />
+
+      <div className="relative z-10 w-full max-w-sm">
         <div className="text-center mb-8">
-          <Link href="/" className="font-mono text-2xl font-bold text-gray-900">
-            [AGENTIOM]
+          <Link href="/" className="inline-block">
+            <Image
+              src="/logo.png"
+              alt="Agentiom"
+              width={180}
+              height={20}
+              className="h-5 w-auto mx-auto"
+              priority
+            />
           </Link>
-          <p className="text-sm text-gray-500 mt-2">Create your account</p>
+          <p className="text-sm text-gray-400 mt-4">Create your account</p>
         </div>
 
-        <div className="bg-white border border-gray-200 p-6">
+        <div className="bg-[#1a1a1a] border border-gray-800 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded">
+              <div className="bg-red-900/30 border border-red-800 text-red-400 text-sm p-3 rounded">
                 {error}
               </div>
             )}
 
             <div>
-              <label htmlFor="email" className="block text-xs font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-xs font-medium text-gray-400 mb-1">
                 Email
               </label>
               <input
@@ -64,14 +75,14 @@ export default function SignupPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:border-primary"
+                className="w-full px-3 py-2 bg-[#0a0a0a] border border-gray-700 text-white text-sm focus:outline-none focus:border-white"
                 placeholder="you@example.com"
                 required
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-xs font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-xs font-medium text-gray-400 mb-1">
                 Password
               </label>
               <input
@@ -79,14 +90,14 @@ export default function SignupPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:border-primary"
+                className="w-full px-3 py-2 bg-[#0a0a0a] border border-gray-700 text-white text-sm focus:outline-none focus:border-white"
                 placeholder="••••••••"
                 required
               />
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-xs font-medium text-gray-700 mb-1">
+              <label htmlFor="confirmPassword" className="block text-xs font-medium text-gray-400 mb-1">
                 Confirm Password
               </label>
               <input
@@ -94,7 +105,7 @@ export default function SignupPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:border-primary"
+                className="w-full px-3 py-2 bg-[#0a0a0a] border border-gray-700 text-white text-sm focus:outline-none focus:border-white"
                 placeholder="••••••••"
                 required
               />
@@ -103,7 +114,7 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary text-white py-2 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="w-full bg-white text-black py-2 text-sm font-bold uppercase tracking-wide hover:bg-gray-100 transition-colors disabled:opacity-50"
             >
               {loading ? 'Creating account...' : 'Create account'}
             </button>
@@ -111,7 +122,7 @@ export default function SignupPage() {
 
           <p className="text-center text-sm text-gray-500 mt-4">
             Already have an account?{' '}
-            <Link href="/login" className="text-primary hover:underline">
+            <Link href="/login" className="text-white hover:underline">
               Sign in
             </Link>
           </p>

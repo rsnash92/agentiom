@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Sidebar,
   Header,
@@ -10,6 +9,7 @@ import {
   CommandCard,
   AgentRow,
   EmptyState,
+  LandingPage,
 } from '@/components';
 import { useAuth } from '@/lib/auth-context';
 import { api, Agent } from '@/lib/api';
@@ -47,15 +47,8 @@ function mapStatus(status: Agent['status']): 'running' | 'stopped' | 'error' {
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
-  const router = useRouter();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loadingAgents, setLoadingAgents] = useState(true);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
 
   useEffect(() => {
     if (user) {
@@ -68,14 +61,15 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
         <div className="text-gray-500">Loading...</div>
       </div>
     );
   }
 
+  // Show landing page for unauthenticated users
   if (!user) {
-    return null;
+    return <LandingPage />;
   }
 
   const runningAgents = agents.filter(a => a.status === 'running').length;
