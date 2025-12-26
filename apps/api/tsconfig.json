@@ -14,6 +14,12 @@
       "@agentiom/logger/*": ["../../packages/logger/src/*"]
     }
   },
-  "include": ["src"],
+  "include": [
+    "src",
+    "../../packages/db/src/**/*.ts",
+    "../../packages/shared/src/**/*.ts",
+    "../../packages/providers/src/**/*.ts",
+    "../../packages/logger/src/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }
