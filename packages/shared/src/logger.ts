@@ -6,9 +6,13 @@
  */
 
 export interface Logger {
+  debug(msg: string): void;
   debug(obj: object, msg?: string): void;
+  info(msg: string): void;
   info(obj: object, msg?: string): void;
+  warn(msg: string): void;
   warn(obj: object, msg?: string): void;
+  error(msg: string): void;
   error(obj: object, msg?: string): void;
 }
 
@@ -28,22 +32,38 @@ class ConsoleLogger implements Logger {
     return `${prefix} ${JSON.stringify(obj)}`;
   }
 
-  debug(obj: object, msg?: string): void {
+  debug(objOrMsg: object | string, msg?: string): void {
     if (process.env.LOG_LEVEL === 'debug') {
-      console.debug(this.format('debug', obj, msg));
+      if (typeof objOrMsg === 'string') {
+        console.debug(this.format('debug', {}, objOrMsg));
+      } else {
+        console.debug(this.format('debug', objOrMsg, msg));
+      }
     }
   }
 
-  info(obj: object, msg?: string): void {
-    console.info(this.format('info', obj, msg));
+  info(objOrMsg: object | string, msg?: string): void {
+    if (typeof objOrMsg === 'string') {
+      console.info(this.format('info', {}, objOrMsg));
+    } else {
+      console.info(this.format('info', objOrMsg, msg));
+    }
   }
 
-  warn(obj: object, msg?: string): void {
-    console.warn(this.format('warn', obj, msg));
+  warn(objOrMsg: object | string, msg?: string): void {
+    if (typeof objOrMsg === 'string') {
+      console.warn(this.format('warn', {}, objOrMsg));
+    } else {
+      console.warn(this.format('warn', objOrMsg, msg));
+    }
   }
 
-  error(obj: object, msg?: string): void {
-    console.error(this.format('error', obj, msg));
+  error(objOrMsg: object | string, msg?: string): void {
+    if (typeof objOrMsg === 'string') {
+      console.error(this.format('error', {}, objOrMsg));
+    } else {
+      console.error(this.format('error', objOrMsg, msg));
+    }
   }
 }
 

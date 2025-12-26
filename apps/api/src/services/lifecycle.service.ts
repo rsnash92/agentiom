@@ -13,8 +13,15 @@
 import { eq, and, lt } from 'drizzle-orm';
 import type { DatabaseClient } from '@agentiom/db';
 import { agents, wakeEvents, type TriggerType } from '@agentiom/db/schema';
-import type { ProviderManager } from '@agentiom/providers';
+import type { IComputeProvider, IStorageProvider, IDNSProvider } from '@agentiom/providers';
 import { createLogger } from '@agentiom/shared';
+
+// Interface for provider set - compatible with both ProviderManager and ProviderSet from deploy.service
+interface Providers {
+  compute: IComputeProvider;
+  storage: IStorageProvider;
+  dns: IDNSProvider;
+}
 
 const log = createLogger('lifecycle-service');
 
@@ -36,7 +43,7 @@ export interface AgentRuntime {
 export class LifecycleService {
   constructor(
     private db: DatabaseClient,
-    private providers: ProviderManager
+    private providers: Providers
   ) {}
 
   /**
