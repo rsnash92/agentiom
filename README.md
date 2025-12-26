@@ -82,7 +82,26 @@ agentiom/
 
 ---
 
+## Deployment Architecture
+
+| Component | Host | Why |
+|-----------|------|-----|
+| Landing Page | Vercel | Static/SSR, optimized for marketing |
+| Dashboard | Vercel | Next.js app, Vercel's sweet spot |
+| API | Fly.io | Long-running, background jobs, persistent connections |
+| Agents | Fly.io | Stateful containers with persistent volumes |
+
+```
+agentiom.dev       → Vercel (landing page)
+app.agentiom.dev   → Vercel (dashboard)
+api.agentiom.dev   → Fly.io (Hono API)
+*.agentiom.dev     → Fly.io (user agents)
+```
+
+---
+
 ## Self-Hosting
+
 ```bash
 # Clone
 git clone https://github.com/Agentiom/Agentiom.git
@@ -98,15 +117,20 @@ cp apps/api/.env.example apps/api/.env
 # Run migrations
 bun db:migrate
 
-# Start
+# Start locally
 bun dev
+
+# Deploy API to Fly.io
+cd apps/api
+fly launch --no-deploy  # First time only
+fly deploy
 ```
 
 ### Requirements
 
 - [Bun](https://bun.sh) v1.1+
-- [Fly.io](https://fly.io) account
-- [Turso](https://turso.tech) account
+- [Fly.io](https://fly.io) account (for API and agents)
+- [Turso](https://turso.tech) account (or SQLite for local dev)
 
 ---
 
