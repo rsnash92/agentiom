@@ -1,7 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd ../.. && turbo build --filter=@agentiom/api",
+  "buildCommand": "cd ../.. && turbo build --filter=@agentiom/api && mkdir -p public",
   "installCommand": "cd ../.. && bun install",
+  "outputDirectory": "public",
   "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
