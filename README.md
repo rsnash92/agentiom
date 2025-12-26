@@ -92,10 +92,10 @@ agentiom/
 | Agents | Fly.io | Stateful containers with persistent volumes |
 
 ```
-agentiom.dev       → Vercel (landing page)
-app.agentiom.dev   → Vercel (dashboard)
-api.agentiom.dev   → Fly.io (Hono API)
-*.agentiom.dev     → Fly.io (user agents)
+agentiom.com       → Vercel (landing page)
+app.agentiom.com   → Vercel (dashboard)
+api.agentiom.com   → Fly.io (Hono API)
+*.agentiom.com     → Fly.io (user agents)
 ```
 
 ---
