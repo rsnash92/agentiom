@@ -30,8 +30,9 @@ interface AgentCardProps {
 }
 
 function AgentCard({ agent, onStart, onStop, onDelete, loading }: AgentCardProps) {
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     running: 'bg-emerald-100 text-emerald-700',
+    sleeping: 'bg-blue-100 text-blue-700',
     stopped: 'bg-gray-100 text-gray-600',
     pending: 'bg-yellow-100 text-yellow-700',
     deploying: 'bg-blue-100 text-blue-700',
@@ -39,8 +40,9 @@ function AgentCard({ agent, onStart, onStop, onDelete, loading }: AgentCardProps
     destroyed: 'bg-gray-100 text-gray-500',
   };
 
-  const statusDotColors = {
+  const statusDotColors: Record<string, string> = {
     running: 'bg-emerald-500',
+    sleeping: 'bg-blue-500',
     stopped: 'bg-gray-400',
     pending: 'bg-yellow-500',
     deploying: 'bg-blue-500 animate-pulse',
@@ -80,22 +82,22 @@ function AgentCard({ agent, onStart, onStop, onDelete, loading }: AgentCardProps
       )}
 
       <div className="flex items-center gap-2">
-        {agent.status === 'stopped' && (
+        {(agent.status === 'stopped' || agent.status === 'sleeping') && (
           <button
             onClick={onStart}
             disabled={loading}
             className="text-xs px-3 py-1.5 bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50"
           >
-            Start
+            {agent.status === 'sleeping' ? 'Wake' : 'Start'}
           </button>
         )}
         {agent.status === 'running' && (
           <button
             onClick={onStop}
             disabled={loading}
-            className="text-xs px-3 py-1.5 bg-gray-500 text-white hover:bg-gray-600 disabled:opacity-50"
+            className="text-xs px-3 py-1.5 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
           >
-            Stop
+            Sleep
           </button>
         )}
         <Link

@@ -79,6 +79,7 @@ export default function DashboardPage() {
   }
 
   const runningAgents = agents.filter(a => a.status === 'running').length;
+  const sleepingAgents = agents.filter(a => a.status === 'sleeping').length;
 
   return (
     <div className="flex min-h-screen">
@@ -94,7 +95,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-4 gap-4 mb-8">
           <StatCard label="Total Agents" value={agents.length} />
           <StatCard label="Running" value={runningAgents} trend={runningAgents > 0 ? 'up' : 'neutral'} />
-          <StatCard label="Stopped" value={agents.filter(a => a.status === 'stopped').length} trend="neutral" />
+          <StatCard label="Sleeping" value={sleepingAgents} trend="neutral" />
           <StatCard label="Failed" value={agents.filter(a => a.status === 'failed').length} trend={agents.filter(a => a.status === 'failed').length > 0 ? 'down' : 'neutral'} />
         </div>
 

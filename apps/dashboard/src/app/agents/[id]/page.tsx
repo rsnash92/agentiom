@@ -133,8 +133,9 @@ export default function AgentDetailPage() {
     return null;
   }
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     running: 'bg-emerald-100 text-emerald-700',
+    sleeping: 'bg-blue-100 text-blue-700',
     stopped: 'bg-gray-100 text-gray-600',
     pending: 'bg-yellow-100 text-yellow-700',
     deploying: 'bg-blue-100 text-blue-700',
@@ -174,22 +175,22 @@ export default function AgentDetailPage() {
                   Deploy
                 </button>
               )}
-              {agent.status === 'stopped' && (
+              {(agent.status === 'stopped' || agent.status === 'sleeping') && (
                 <button
                   onClick={handleStart}
                   disabled={actionLoading}
                   className="text-sm px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50"
                 >
-                  Start
+                  {agent.status === 'sleeping' ? 'Wake' : 'Start'}
                 </button>
               )}
               {agent.status === 'running' && (
                 <button
                   onClick={handleStop}
                   disabled={actionLoading}
-                  className="text-sm px-4 py-2 bg-gray-500 text-white hover:bg-gray-600 disabled:opacity-50"
+                  className="text-sm px-4 py-2 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
                 >
-                  Stop
+                  Sleep
                 </button>
               )}
               <button

@@ -167,7 +167,7 @@ export interface Agent {
   name: string;
   slug: string;
   description: string | null;
-  status: 'pending' | 'deploying' | 'running' | 'stopped' | 'failed' | 'destroyed';
+  status: 'pending' | 'deploying' | 'running' | 'sleeping' | 'stopped' | 'failed' | 'destroyed';
   region: string;
   machineId: string | null;
   volumeId: string | null;
