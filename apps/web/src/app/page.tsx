@@ -12,6 +12,18 @@ export default function Home() {
 
       {/* Content overlay */}
       <div className="relative z-10">
+        {/* Beta Banner */}
+        <div className="bg-white text-black text-center py-2 px-4 text-sm">
+          <span>Want to take part in our private beta?</span>{' '}
+          <Link
+            href="https://discord.gg/agentiom"
+            target="_blank"
+            className="font-bold underline hover:no-underline"
+          >
+            Join our Discord
+          </Link>
+        </div>
+
         {/* Navigation */}
         <nav className="flex items-center justify-between px-6 py-4">
           <Link href="/">
@@ -40,17 +52,22 @@ export default function Home() {
         {/* Hero Section */}
         <main className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] px-4">
           <div className="max-w-4xl mx-auto text-center">
+            {/* Beta Badge */}
+            <div className="inline-flex items-center gap-2 mb-6">
+              <span className="bg-white text-black text-xs font-bold px-2 py-1 uppercase tracking-wider">
+                Beta
+              </span>
+            </div>
+
             {/* Main Headline */}
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-              <span className="text-white">Build Agents,</span>{' '}
-              <span className="text-gray-500">Not Infrastructure</span>
+              <span className="text-white">Deploy AI agents with</span>{' '}
+              <span className="text-gray-500">persistent memory.</span>
             </h1>
 
             {/* Subheadline */}
             <p className="text-lg md:text-xl text-gray-400 mb-12 max-w-2xl mx-auto">
-              Create and{' '}
-              <span className="bg-white text-black px-1 py-0.5">deploy</span>{' '}
-              AI agents in one command. Open source. Zero lock-in.
+              One command. State included. No database setup.
             </p>
 
             {/* Terminal Commands */}
