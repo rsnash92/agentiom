@@ -88,5 +88,5 @@ export function isLoggedIn(): boolean {
  * Get API URL from environment or default
  */
 export function getApiUrl(): string {
-  return process.env.AGENTIOM_API_URL ?? 'http://localhost:3000';
+  return process.env.AGENTIOM_API_URL ?? 'https://agentiom-api.fly.dev';
 }

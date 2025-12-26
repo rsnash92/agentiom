@@ -17,7 +17,7 @@ async function apiRequest(
   path: string,
   body?: any
 ): Promise<any> {
-  const baseUrl = process.env.AGENTIOM_API_URL || 'https://api.agentiom.dev';
+  const baseUrl = process.env.AGENTIOM_API_URL || 'https://agentiom-api.fly.dev';
   const token = process.env.AGENTIOM_TOKEN;
 
   if (!token) {

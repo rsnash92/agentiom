@@ -1,8 +1,15 @@
 {
   "name": "@agentiom/cli",
-  "version": "0.0.1",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
+  "description": "Deploy and manage stateful AI agents",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rsnash92/Agentiom.git",
+    "directory": "apps/cli"
+  },
+  "keywords": ["ai", "agents", "deployment", "fly.io", "stateful"],
   "bin": {
     "agentiom": "./dist/index.js"
   },
@@ -16,11 +23,17 @@
     "picocolors": "^1.1.1",
     "ora": "^8.1.1",
     "yaml": "^2.6.1",
-    "@agentiom/shared": "workspace:*"
+    "chalk": "^5.4.1"
   },
   "devDependencies": {
-    "@agentiom/typescript-config": "workspace:*",
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
   }
 }
