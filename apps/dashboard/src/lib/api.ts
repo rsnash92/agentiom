@@ -5,8 +5,10 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 interface ApiError {
-  error: string;
-  message?: string;
+  error: {
+    code: string;
+    message: string;
+  };
 }
 
 class ApiClient {
@@ -48,8 +50,8 @@ class ApiClient {
     const data = await res.json();
 
     if (!res.ok) {
-      const error = data as ApiError;
-      throw new Error(error.message || error.error || 'Request failed');
+      const errorData = data as ApiError;
+      throw new Error(errorData.error?.message || 'Request failed');
     }
 
     return data as T;
