@@ -62,6 +62,7 @@ const app = new Hono<Env>();
 app.use('*', logger());
 app.use('*', cors({
   origin: [
+    'http://localhost:3000',
     'http://localhost:3002',
     'https://app.agentiom.com',
     'https://agentiom.com',
