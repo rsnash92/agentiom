@@ -60,7 +60,14 @@ const app = new Hono<Env>();
 
 // Global middleware
 app.use('*', logger());
-app.use('*', cors());
+app.use('*', cors({
+  origin: [
+    'http://localhost:3002',
+    'https://app.agentiom.com',
+    'https://agentiom.com',
+  ],
+  credentials: true,
+}));
 
 // Inject db and lifecycle into context for all routes
 app.use('*', async (c, next) => {
