@@ -2,7 +2,7 @@
 # Deploy with: fly deploy (from repo root)
 
 app = "agentiom-api"
-primary_region = "iad"
+primary_region = "lhr"  # London - closer to Turso DB in Ireland
 
 [build]
   dockerfile = "apps/api/Dockerfile"
